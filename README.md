@@ -2,7 +2,7 @@
 
 A Puerto Rico geography guessing game, maptap.gg-style. Tap a satellite map as close as you can to the prompted place — 5 rounds, distance-based scoring, 25,000 points max.
 
-**Play now: https://maptap-pr.vercel.app**
+**Play now: https://map-tap-pr.angel1254.com**
 
 ## Stack
 
