@@ -1,8 +1,8 @@
-# MapTap PR 🇵🇷
+# IslaTap 🇵🇷
 
-A Puerto Rico geography guessing game, maptap.gg-style. Tap a satellite map as close as you can to the prompted place — 5 rounds, distance-based scoring, 25,000 points max.
+A Puerto Rico geography guessing game, tap-the-map style. Tap a satellite map as close as you can to the prompted place — 5 rounds, distance-based scoring, 25,000 points max.
 
-**Play now: https://map-tap-pr.angel1254.com**
+**Play now: https://islatap.angel1254.com**
 
 ## Stack
 

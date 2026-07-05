@@ -9,7 +9,7 @@ export default function StartScreen({ bestScore, onPlay }: StartScreenProps) {
       <div className="screen__card">
         <p className="screen__kicker">🇵🇷 Puerto Rico Edition</p>
         <h1 className="screen__title">
-          MapTap <span>PR</span>
+          Isla<span>Tap</span>
         </h1>
         <p className="screen__lede">
           Five places. One tap each. How well do you really know la Isla del Encanto?

@@ -1,7 +1,14 @@
-# MapTap PR — Design Spec
+# IslaTap — Design Spec
 
 **Date:** 2026-07-04
 **Status:** Approved (design), pending implementation via one-shot agent (Fable)
+
+**Naming note (2026-07-05):** originally designed under the working name
+"MapTap PR" (as an homage to [maptap.gg](https://maptap.gg/), the game that
+inspired this project). Renamed to **IslaTap** to avoid trademark confusion
+with MapTap Inc.'s product — the mechanics/scoring/data below are unchanged,
+only the brand name is. References to "maptap.gg" and "maptap's core loop"
+below describe the inspiration, not our own branding.
 
 ## Summary
 

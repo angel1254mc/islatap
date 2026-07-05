@@ -51,7 +51,7 @@ export function pickGameRounds(pool: readonly GameLocation[] = LOCATIONS): GameL
   return shuffle(picked);
 }
 
-const BEST_SCORE_KEY = 'maptap-pr:best-score';
+const BEST_SCORE_KEY = 'islatap:best-score';
 
 export function loadBestScore(): number | null {
   try {
@@ -82,7 +82,7 @@ function medalFor(points: number): string {
 }
 
 export function buildShareText(outcomes: readonly RoundOutcome[], total: number): string {
-  const header = `MapTap PR — ${total.toLocaleString('en-US')} / ${MAX_GAME_POINTS.toLocaleString('en-US')} 🇵🇷`;
+  const header = `IslaTap — ${total.toLocaleString('en-US')} / ${MAX_GAME_POINTS.toLocaleString('en-US')} 🇵🇷`;
   const lines = outcomes.map((outcome, index) => {
     const badge = ROUND_EMOJI[index] ?? `${index + 1}.`;
     return `${badge} ${medalFor(outcome.points)} ${outcome.location.name} — ${formatDistance(outcome.distanceKm)} — ${outcome.points.toLocaleString('en-US')}`;
