@@ -25,7 +25,16 @@ export function startShapeLoad(url = '/shapes-pr.json'): Promise<void> {
 /** Shape for a geoid, or undefined if unknown / not yet loaded / load failed. */
 export function getShape(geoid: string | undefined): MultiPolygon | undefined {
   if (!geoid || !shapes) return undefined;
-  return shapes[geoid];
+  const value = shapes[geoid];
+  // Guard against malformed data (e.g. a future backend swap) feeding a
+  // truthy non-MultiPolygon value into the geometry code downstream.
+  const isMultiPolygon =
+    Array.isArray(value) &&
+    value.length > 0 &&
+    Array.isArray(value[0]) &&
+    Array.isArray(value[0][0]) &&
+    Array.isArray(value[0][0][0]);
+  return isMultiPolygon ? value : undefined;
 }
 
 export function resetShapesForTest(): void {

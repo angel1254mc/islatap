@@ -54,4 +54,13 @@ describe('shapes loader', () => {
     await expect(startShapeLoad()).resolves.toBeUndefined();
     expect(getShape('72127')).toBeUndefined();
   });
+
+  it('rejects a malformed shape entry instead of returning it', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ '72127': {} }) }),
+    );
+    await startShapeLoad();
+    expect(getShape('72127')).toBeUndefined();
+  });
 });
