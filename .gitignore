@@ -1,5 +1,8 @@
 node_modules/
 dist/
+
+# Cached TIGER/Line zips pulled by scripts/build-locations.mjs (~8 MB, re-downloadable)
+scripts/.tiger-cache/
 .DS_Store
 *.local
 

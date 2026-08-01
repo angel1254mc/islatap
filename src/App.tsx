@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import MapView from './components/MapView';
 import Results from './components/Results';
 import RoundPrompt from './components/RoundPrompt';
@@ -6,7 +6,8 @@ import RoundResult from './components/RoundResult';
 import StartScreen from './components/StartScreen';
 import type { GameLocation } from './data/locations';
 import { loadBestScore, pickGameRounds, saveBestScore, type RoundOutcome } from './lib/game';
-import { haversineKm, scoreForDistance, type LatLng } from './lib/scoring';
+import { distanceToShapeKm, haversineKm, pointInMultiPolygon, scoreForDistance, type LatLng } from './lib/scoring';
+import { getShape, startShapeLoad } from './lib/shapes';
 
 type Phase = 'start' | 'playing' | 'revealed' | 'results';
 
@@ -17,6 +18,10 @@ export default function App() {
   const [outcomes, setOutcomes] = useState<RoundOutcome[]>([]);
   const [bestScore, setBestScore] = useState<number | null>(() => loadBestScore());
   const [isNewBest, setIsNewBest] = useState(false);
+
+  useEffect(() => {
+    void startShapeLoad();
+  }, []);
 
   const totalScore = useMemo(
     () => outcomes.reduce((sum, outcome) => sum + outcome.points, 0),
@@ -38,9 +43,16 @@ export default function App() {
   const handleGuess = useCallback(
     (guess: LatLng) => {
       if (phase !== 'playing' || !currentLocation) return;
-      const distanceKm = haversineKm(guess, currentLocation);
+      const shape = getShape(currentLocation.geoid);
+      const inside = shape ? pointInMultiPolygon(guess, shape) : false;
+      const distanceKm = shape
+        ? distanceToShapeKm(guess, shape)
+        : haversineKm(guess, currentLocation);
       const points = scoreForDistance(distanceKm);
-      setOutcomes((previous) => [...previous, { location: currentLocation, guess, distanceKm, points }]);
+      setOutcomes((previous) => [
+        ...previous,
+        { location: currentLocation, guess, distanceKm, points, inside, shape: shape ?? null },
+      ]);
       setPhase('revealed');
     },
     [phase, currentLocation],
@@ -69,6 +81,8 @@ export default function App() {
         revealed={revealed}
         guess={revealed && lastOutcome ? lastOutcome.guess : null}
         target={revealed && currentLocation ? currentLocation : null}
+        targetShape={revealed && lastOutcome ? lastOutcome.shape : null}
+        inside={revealed && lastOutcome ? lastOutcome.inside : false}
         onGuess={handleGuess}
       />
 

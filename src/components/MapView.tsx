@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import L from 'leaflet';
 import {
   MapContainer,
   Marker,
+  Polygon,
   Polyline,
   TileLayer,
   Tooltip,
@@ -12,7 +13,8 @@ import {
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { GameLocation } from '../data/locations';
-import type { LatLng } from '../lib/scoring';
+import { haversineKm, nearestPointOnShape, type MultiPolygon, type LatLng } from '../lib/scoring';
+import { getShapesByLayer, startShapeLoad, type ShapeLayer } from '../lib/shapes';
 
 // Base imagery is isolated here so the provider can be swapped later.
 const BASE_LAYER_URL =
@@ -27,6 +29,49 @@ const INITIAL_CENTER: L.LatLngTuple = [18.22, -66.35];
 const INITIAL_ZOOM = 9;
 const MIN_ZOOM = 9;
 const MAX_ZOOM = 16;
+
+// Boundary QA overlay: ?debug=shapes renders every municipio outline at once so
+// edge alignment between neighbors can be eyeballed against the imagery;
+// &layer=barrio|comunidad|subbarrio|all switches the Census layer. Read once at
+// module load — it's a URL-only debug tool with no game-state interaction.
+const DEBUG_QUERY = new URLSearchParams(window.location.search);
+const DEBUG_SHAPES = DEBUG_QUERY.get('debug') === 'shapes';
+const DEBUG_LAYERS: readonly ShapeLayer[] = ['municipio', 'barrio', 'comunidad', 'subbarrio', 'all'];
+const DEBUG_LAYER: ShapeLayer = (DEBUG_LAYERS as readonly string[]).includes(
+  DEBUG_QUERY.get('layer') ?? '',
+)
+  ? (DEBUG_QUERY.get('layer') as ShapeLayer)
+  : 'municipio';
+
+function DebugShapesOverlay() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    void startShapeLoad().then(() => {
+      if (mounted) setReady(true);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!ready) return null;
+  return (
+    <>
+      {getShapesByLayer(DEBUG_LAYER).map(([geoid, shape]) =>
+        shape.map((part, index) => (
+          <Polygon
+            key={`${geoid}-${index}`}
+            positions={part}
+            interactive={false}
+            pathOptions={{ color: '#38bdf8', weight: 1, fillColor: '#38bdf8', fillOpacity: 0.04 }}
+          />
+        )),
+      )}
+    </>
+  );
+}
 
 // Leaflet's default icon URLs break under bundlers, so pins are explicit
 // divIcons with inline SVG instead.
@@ -67,9 +112,17 @@ interface ViewControllerProps {
   revealed: boolean;
   guess: LatLng | null;
   target: GameLocation | null;
+  targetShape: MultiPolygon | null;
 }
 
-function ViewController({ roundIndex, revealed, guess, target }: ViewControllerProps) {
+// Some municipio shapes include distant offshore parts as separate polygon parts —
+// e.g. Mayagüez (geoid 72097) includes Isla de Mona, ~92 km off the west coast.
+// Extending the reveal bounds to cover those parts pushes the viewport past
+// MIN_ZOOM and centers the camera on open ocean instead of the mainland shape, so
+// parts whose nearest vertex is far from the target are excluded from the bounds.
+const FAR_PART_KM = 25;
+
+function ViewController({ roundIndex, revealed, guess, target, targetShape }: ViewControllerProps) {
   const map = useMap();
 
   useEffect(() => {
@@ -79,9 +132,20 @@ function ViewController({ roundIndex, revealed, guess, target }: ViewControllerP
   useEffect(() => {
     if (revealed && guess && target) {
       const bounds = L.latLngBounds([guess.lat, guess.lng], [target.lat, target.lng]);
-      map.flyToBounds(bounds.pad(0.4), { duration: 0.8, maxZoom: 13 });
+      if (targetShape) {
+        for (const part of targetShape) {
+          const outer = part[0]; // outer ring only
+          const nearestKm = outer.reduce(
+            (min, [lat, lng]) => Math.min(min, haversineKm(target, { lat, lng })),
+            Infinity,
+          );
+          if (nearestKm > FAR_PART_KM) continue;
+          for (const point of outer) bounds.extend(point as L.LatLngTuple);
+        }
+      }
+      map.flyToBounds(bounds.pad(targetShape ? 0.15 : 0.4), { duration: 0.8, maxZoom: 13 });
     }
-  }, [revealed, guess, target, map]);
+  }, [revealed, guess, target, targetShape, map]);
 
   return null;
 }
@@ -92,6 +156,8 @@ interface MapViewProps {
   revealed: boolean;
   guess: LatLng | null;
   target: GameLocation | null;
+  targetShape: MultiPolygon | null;
+  inside: boolean;
   onGuess: (guess: LatLng) => void;
 }
 
@@ -101,8 +167,20 @@ export default function MapView({
   revealed,
   guess,
   target,
+  targetShape,
+  inside,
   onGuess,
 }: MapViewProps) {
+  // Outside guesses point at the nearest boundary, not the internal point.
+  const lineEnd: LatLng | null =
+    revealed && guess && target
+      ? targetShape
+        ? inside
+          ? null // inside: no line at all
+          : nearestPointOnShape(guess, targetShape).point
+        : { lat: target.lat, lng: target.lng }
+      : null;
+
   return (
     <div className={`map-shell${interactive ? ' map-shell--armed' : ''}`}>
       <MapContainer
@@ -118,26 +196,44 @@ export default function MapView({
         <TileLayer url={BASE_LAYER_URL} attribution={BASE_LAYER_ATTRIBUTION} />
         <ZoomControl position="bottomleft" />
         <ClickHandler enabled={interactive} onGuess={onGuess} />
-        <ViewController roundIndex={roundIndex} revealed={revealed} guess={guess} target={target} />
+        {DEBUG_SHAPES && <DebugShapesOverlay />}
+        <ViewController
+          roundIndex={roundIndex}
+          revealed={revealed}
+          guess={guess}
+          target={target}
+          targetShape={targetShape}
+        />
+
+        {revealed && targetShape &&
+          targetShape.map((part, index) => (
+            <Polygon
+              key={index}
+              positions={part}
+              pathOptions={{ color: '#2dd4a7', weight: 2, fillColor: '#2dd4a7', fillOpacity: 0.15 }}
+            />
+          ))}
 
         {revealed && guess && target && (
           <>
-            <Polyline
-              positions={[
-                [guess.lat, guess.lng],
-                [target.lat, target.lng],
-              ]}
-              pathOptions={{
-                color: '#ffffff',
-                weight: 2.5,
-                opacity: 0.9,
-                dashArray: '6 8',
-                className: 'guess-line',
-              }}
-            />
+            {lineEnd && (
+              <Polyline
+                positions={[
+                  [guess.lat, guess.lng],
+                  [lineEnd.lat, lineEnd.lng],
+                ]}
+                pathOptions={{
+                  color: '#ffffff',
+                  weight: 2.5,
+                  opacity: 0.9,
+                  dashArray: '6 8',
+                  className: 'guess-line',
+                }}
+              />
+            )}
             <Marker position={[guess.lat, guess.lng]} icon={GUESS_ICON}>
               <Tooltip direction="top" permanent className="map-tag map-tag--guess">
-                Tu toque
+                {inside ? '¡Adentro!' : 'Tu toque'}
               </Tooltip>
             </Marker>
             <Marker position={[target.lat, target.lng]} icon={TARGET_ICON}>

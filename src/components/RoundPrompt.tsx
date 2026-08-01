@@ -1,9 +1,13 @@
-import type { Category, Difficulty, GameLocation } from '../data/locations';
+import type { Difficulty, GameLocation, Subtype } from '../data/locations';
 
-const CATEGORY_LABELS: Record<Category, string> = {
+// Labelled by subtype rather than category so a comunidad reads as a comunidad,
+// even though it shares the 'barrio' bucket (and therefore the tag colour).
+const SUBTYPE_LABELS: Record<Subtype, string> = {
   municipio: 'Municipio',
   landmark: 'Landmark',
   barrio: 'Barrio',
+  'barrio-pueblo': 'Pueblo',
+  comunidad: 'Comunidad',
 };
 
 const DIFFICULTY_LABELS: Record<Difficulty, string> = {
@@ -33,10 +37,13 @@ export default function RoundPrompt({
 
       <div className="hud__prompt" key={location.id}>
         <span className="hud__label">Tap as close as you can to</span>
-        <h1 className="hud__place">{location.name}</h1>
+        <h1 className="hud__place">
+          {location.name}
+          {location.municipio && <span className="hud__municipio">{location.municipio}</span>}
+        </h1>
         <div className="hud__tags">
           <span className={`tag tag--${location.category}`}>
-            {CATEGORY_LABELS[location.category]}
+            {SUBTYPE_LABELS[location.subtype]}
           </span>
           <span className={`tag tag--${location.difficulty}`}>
             {DIFFICULTY_LABELS[location.difficulty]}

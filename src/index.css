@@ -198,6 +198,16 @@ button {
   line-height: 1.15;
 }
 
+/* Barrio names repeat across municipios, so the municipio is part of the prompt,
+   not decoration — kept on its own line and dimmed rather than hidden. */
+.hud__municipio {
+  display: block;
+  margin-top: 2px;
+  font-size: clamp(13px, 2.4vw, 16px);
+  font-weight: 500;
+  color: var(--ink-dim);
+}
+
 .hud__tags {
   display: flex;
   justify-content: center;
