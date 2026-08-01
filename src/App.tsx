@@ -51,7 +51,7 @@ export default function App() {
       const points = scoreForDistance(distanceKm);
       setOutcomes((previous) => [
         ...previous,
-        { location: currentLocation, guess, distanceKm, points, inside },
+        { location: currentLocation, guess, distanceKm, points, inside, shape: shape ?? null },
       ]);
       setPhase('revealed');
     },
@@ -81,9 +81,7 @@ export default function App() {
         revealed={revealed}
         guess={revealed && lastOutcome ? lastOutcome.guess : null}
         target={revealed && currentLocation ? currentLocation : null}
-        targetShape={
-          revealed && currentLocation ? (getShape(currentLocation.geoid) ?? null) : null
-        }
+        targetShape={revealed && lastOutcome ? lastOutcome.shape : null}
         inside={revealed && lastOutcome ? lastOutcome.inside : false}
         onGuess={handleGuess}
       />

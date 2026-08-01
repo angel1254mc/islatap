@@ -84,7 +84,7 @@ describe('buildShareText', () => {
 
   it('shows the distance for outside guesses', () => {
     const text = buildShareText(
-      [{ ...base, distanceKm: 12.3, points: 1450, inside: false }],
+      [{ ...base, distanceKm: 12.3, points: 1450, inside: false, shape: null }],
       1450,
     );
     expect(text).toContain('12.3 km');
@@ -93,7 +93,7 @@ describe('buildShareText', () => {
 
   it('shows ¡Adentro! instead of a distance for inside guesses', () => {
     const text = buildShareText(
-      [{ ...base, distanceKm: 0, points: 5000, inside: true }],
+      [{ ...base, distanceKm: 0, points: 5000, inside: true, shape: null }],
       5000,
     );
     expect(text).toContain('¡Adentro!');

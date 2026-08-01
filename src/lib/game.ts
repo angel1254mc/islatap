@@ -1,5 +1,5 @@
 import { LOCATIONS, displayName, type Category, type GameLocation } from '../data/locations';
-import { MAX_ROUND_POINTS, formatDistance, type LatLng } from './scoring';
+import { MAX_ROUND_POINTS, formatDistance, type LatLng, type MultiPolygon } from './scoring';
 
 export const ROUNDS_PER_GAME = 5;
 export const MAX_GAME_POINTS = ROUNDS_PER_GAME * MAX_ROUND_POINTS;
@@ -11,6 +11,13 @@ export interface RoundOutcome {
   points: number;
   /** True when the guess landed inside the target's boundary shape. */
   inside: boolean;
+  /**
+   * The shape used for scoring this round, captured at guess time. Reused for
+   * the reveal render so the drawn polygon can never disagree with the score
+   * (getShape() could otherwise return something different by then, e.g. once
+   * shapes-pr.json finishes loading between tap and reveal).
+   */
+  shape: MultiPolygon | null;
 }
 
 function shuffle<T>(items: readonly T[]): T[] {
