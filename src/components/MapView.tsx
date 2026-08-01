@@ -13,7 +13,7 @@ import {
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { GameLocation } from '../data/locations';
-import { nearestPointOnShape, type MultiPolygon, type LatLng } from '../lib/scoring';
+import { haversineKm, nearestPointOnShape, type MultiPolygon, type LatLng } from '../lib/scoring';
 
 // Base imagery is isolated here so the provider can be swapped later.
 const BASE_LAYER_URL =
@@ -71,6 +71,13 @@ interface ViewControllerProps {
   targetShape: MultiPolygon | null;
 }
 
+// Some municipio shapes include distant offshore parts as separate polygon parts —
+// e.g. Mayagüez (geoid 72097) includes Isla de Mona, ~92 km off the west coast.
+// Extending the reveal bounds to cover those parts pushes the viewport past
+// MIN_ZOOM and centers the camera on open ocean instead of the mainland shape, so
+// parts whose nearest vertex is far from the target are excluded from the bounds.
+const FAR_PART_KM = 25;
+
 function ViewController({ roundIndex, revealed, guess, target, targetShape }: ViewControllerProps) {
   const map = useMap();
 
@@ -83,7 +90,13 @@ function ViewController({ roundIndex, revealed, guess, target, targetShape }: Vi
       const bounds = L.latLngBounds([guess.lat, guess.lng], [target.lat, target.lng]);
       if (targetShape) {
         for (const part of targetShape) {
-          for (const point of part[0]) bounds.extend(point as L.LatLngTuple); // outer ring only
+          const outer = part[0]; // outer ring only
+          const nearestKm = outer.reduce(
+            (min, [lat, lng]) => Math.min(min, haversineKm(target, { lat, lng })),
+            Infinity,
+          );
+          if (nearestKm > FAR_PART_KM) continue;
+          for (const point of outer) bounds.extend(point as L.LatLngTuple);
         }
       }
       map.flyToBounds(bounds.pad(targetShape ? 0.15 : 0.4), { duration: 0.8, maxZoom: 13 });
