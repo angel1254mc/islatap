@@ -9,6 +9,8 @@ export interface RoundOutcome {
   guess: LatLng;
   distanceKm: number;
   points: number;
+  /** True when the guess landed inside the target's boundary shape. */
+  inside: boolean;
 }
 
 function shuffle<T>(items: readonly T[]): T[] {
@@ -90,7 +92,8 @@ export function buildShareText(outcomes: readonly RoundOutcome[], total: number)
   const header = `IslaTap — ${total.toLocaleString('en-US')} / ${MAX_GAME_POINTS.toLocaleString('en-US')} 🇵🇷`;
   const lines = outcomes.map((outcome, index) => {
     const badge = ROUND_EMOJI[index] ?? `${index + 1}.`;
-    return `${badge} ${medalFor(outcome.points)} ${displayName(outcome.location)} — ${formatDistance(outcome.distanceKm)} — ${outcome.points.toLocaleString('en-US')}`;
+    const distanceLabel = outcome.inside ? '¡Adentro!' : formatDistance(outcome.distanceKm);
+    return `${badge} ${medalFor(outcome.points)} ${displayName(outcome.location)} — ${distanceLabel} — ${outcome.points.toLocaleString('en-US')}`;
   });
   return [header, ...lines].join('\n');
 }
