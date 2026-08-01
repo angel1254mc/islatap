@@ -81,6 +81,10 @@ export default function App() {
         revealed={revealed}
         guess={revealed && lastOutcome ? lastOutcome.guess : null}
         target={revealed && currentLocation ? currentLocation : null}
+        targetShape={
+          revealed && currentLocation ? (getShape(currentLocation.geoid) ?? null) : null
+        }
+        inside={revealed && lastOutcome ? lastOutcome.inside : false}
         onGuess={handleGuess}
       />
 

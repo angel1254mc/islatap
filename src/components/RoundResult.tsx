@@ -22,7 +22,9 @@ export default function RoundResult({ outcome, isLastRound, onNext }: RoundResul
       <div className="result-panel__stats">
         <div className="stat">
           <span className="stat__label">Distance</span>
-          <strong className="stat__value">{formatDistance(outcome.distanceKm)}</strong>
+          <strong className="stat__value">
+            {outcome.inside ? '¡Adentro!' : formatDistance(outcome.distanceKm)}
+          </strong>
         </div>
         <div className="stat stat--points">
           <span className="stat__label">Points</span>

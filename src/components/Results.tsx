@@ -76,7 +76,7 @@ export default function Results({
                     {displayName(outcome.location)}
                     <small>{outcome.location.subtype}</small>
                   </td>
-                  <td>{formatDistance(outcome.distanceKm)}</td>
+                  <td>{outcome.inside ? '¡Adentro!' : formatDistance(outcome.distanceKm)}</td>
                   <td className="results__points-col">
                     {outcome.points.toLocaleString('en-US')}
                   </td>

@@ -3,6 +3,7 @@ import L from 'leaflet';
 import {
   MapContainer,
   Marker,
+  Polygon,
   Polyline,
   TileLayer,
   Tooltip,
@@ -12,7 +13,7 @@ import {
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { GameLocation } from '../data/locations';
-import type { LatLng } from '../lib/scoring';
+import { nearestPointOnShape, type MultiPolygon, type LatLng } from '../lib/scoring';
 
 // Base imagery is isolated here so the provider can be swapped later.
 const BASE_LAYER_URL =
@@ -67,9 +68,10 @@ interface ViewControllerProps {
   revealed: boolean;
   guess: LatLng | null;
   target: GameLocation | null;
+  targetShape: MultiPolygon | null;
 }
 
-function ViewController({ roundIndex, revealed, guess, target }: ViewControllerProps) {
+function ViewController({ roundIndex, revealed, guess, target, targetShape }: ViewControllerProps) {
   const map = useMap();
 
   useEffect(() => {
@@ -79,9 +81,14 @@ function ViewController({ roundIndex, revealed, guess, target }: ViewControllerP
   useEffect(() => {
     if (revealed && guess && target) {
       const bounds = L.latLngBounds([guess.lat, guess.lng], [target.lat, target.lng]);
-      map.flyToBounds(bounds.pad(0.4), { duration: 0.8, maxZoom: 13 });
+      if (targetShape) {
+        for (const part of targetShape) {
+          for (const point of part[0]) bounds.extend(point as L.LatLngTuple); // outer ring only
+        }
+      }
+      map.flyToBounds(bounds.pad(targetShape ? 0.15 : 0.4), { duration: 0.8, maxZoom: 13 });
     }
-  }, [revealed, guess, target, map]);
+  }, [revealed, guess, target, targetShape, map]);
 
   return null;
 }
@@ -92,6 +99,8 @@ interface MapViewProps {
   revealed: boolean;
   guess: LatLng | null;
   target: GameLocation | null;
+  targetShape: MultiPolygon | null;
+  inside: boolean;
   onGuess: (guess: LatLng) => void;
 }
 
@@ -101,8 +110,20 @@ export default function MapView({
   revealed,
   guess,
   target,
+  targetShape,
+  inside,
   onGuess,
 }: MapViewProps) {
+  // Outside guesses point at the nearest boundary, not the internal point.
+  const lineEnd: LatLng | null =
+    revealed && guess && target
+      ? targetShape
+        ? inside
+          ? null // inside: no line at all
+          : nearestPointOnShape(guess, targetShape).point
+        : { lat: target.lat, lng: target.lng }
+      : null;
+
   return (
     <div className={`map-shell${interactive ? ' map-shell--armed' : ''}`}>
       <MapContainer
@@ -118,26 +139,43 @@ export default function MapView({
         <TileLayer url={BASE_LAYER_URL} attribution={BASE_LAYER_ATTRIBUTION} />
         <ZoomControl position="bottomleft" />
         <ClickHandler enabled={interactive} onGuess={onGuess} />
-        <ViewController roundIndex={roundIndex} revealed={revealed} guess={guess} target={target} />
+        <ViewController
+          roundIndex={roundIndex}
+          revealed={revealed}
+          guess={guess}
+          target={target}
+          targetShape={targetShape}
+        />
+
+        {revealed && targetShape &&
+          targetShape.map((part, index) => (
+            <Polygon
+              key={index}
+              positions={part}
+              pathOptions={{ color: '#2dd4a7', weight: 2, fillColor: '#2dd4a7', fillOpacity: 0.15 }}
+            />
+          ))}
 
         {revealed && guess && target && (
           <>
-            <Polyline
-              positions={[
-                [guess.lat, guess.lng],
-                [target.lat, target.lng],
-              ]}
-              pathOptions={{
-                color: '#ffffff',
-                weight: 2.5,
-                opacity: 0.9,
-                dashArray: '6 8',
-                className: 'guess-line',
-              }}
-            />
+            {lineEnd && (
+              <Polyline
+                positions={[
+                  [guess.lat, guess.lng],
+                  [lineEnd.lat, lineEnd.lng],
+                ]}
+                pathOptions={{
+                  color: '#ffffff',
+                  weight: 2.5,
+                  opacity: 0.9,
+                  dashArray: '6 8',
+                  className: 'guess-line',
+                }}
+              />
+            )}
             <Marker position={[guess.lat, guess.lng]} icon={GUESS_ICON}>
               <Tooltip direction="top" permanent className="map-tag map-tag--guess">
-                Tu toque
+                {inside ? '¡Adentro!' : 'Tu toque'}
               </Tooltip>
             </Marker>
             <Marker position={[target.lat, target.lng]} icon={TARGET_ICON}>
