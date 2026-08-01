@@ -212,37 +212,14 @@ function pointInShape(shape, x, y) {
 
 // ------------------------------------------------------- shape emission
 
-// Simplification happens in a locally-scaled plane so tolerance is isotropic.
-const LNG_SCALE = Math.cos((18.22 * Math.PI) / 180); // PR mid-latitude
-const SIMPLIFY_TOLERANCE_DEG = 0.00055; // \u2248 60 m \u2014 invisible at reveal zoom
+// No extra simplification: the cb_*_500k inputs are already generalized by Census
+// AS A LAYER, so adjacent units share identical border vertices. Running our own
+// per-polygon Douglas\u2013Peucker here (as an earlier revision did) simplified each
+// polygon independently and broke that coincidence \u2014 neighboring barrios kept
+// different vertices along the same border, leaving ~60 m slivers visible when
+// shapes are overlaid (e.g. the ?debug=shapes view). Identical rounding of
+// identical source coordinates preserves shared edges exactly.
 const COORD_DECIMALS = 5; // ~1 m
-
-function perpendicularDist(p, a, b) {
-  const ax = a[0] * LNG_SCALE, ay = a[1];
-  const bx = b[0] * LNG_SCALE, by = b[1];
-  const px = p[0] * LNG_SCALE, py = p[1];
-  const dx = bx - ax, dy = by - ay;
-  const lengthSq = dx * dx + dy * dy;
-  if (lengthSq === 0) return Math.hypot(px - ax, py - ay);
-  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
-  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
-}
-
-/** Classic Douglas\u2013Peucker. Ring endpoints coincide, which degrades the first
- *  split to radial distance from the start point \u2014 fine for closed rings. */
-function douglasPeucker(points, tolerance) {
-  if (points.length <= 2) return points;
-  let maxDist = 0;
-  let maxIdx = 0;
-  for (let i = 1; i < points.length - 1; i++) {
-    const d = perpendicularDist(points[i], points[0], points[points.length - 1]);
-    if (d > maxDist) { maxDist = d; maxIdx = i; }
-  }
-  if (maxDist <= tolerance) return [points[0], points[points.length - 1]];
-  const left = douglasPeucker(points.slice(0, maxIdx + 1), tolerance);
-  const right = douglasPeucker(points.slice(maxIdx), tolerance);
-  return [...left.slice(0, -1), ...right];
-}
 
 /** Shoelace area; positive = counter-clockwise in the lng/lat plane. */
 function shoelace(ring) {
@@ -264,11 +241,10 @@ function pointInRing(pt, ring) {
   return inside;
 }
 
-/** Simplify one [lng,lat] ring \u2192 rounded, deduped [lat,lng] ring (or null if collapsed). */
+/** One [lng,lat] ring \u2192 rounded, deduped [lat,lng] ring (or null if collapsed). */
 function toOutputRing(ring) {
-  const simplified = douglasPeucker(ring, SIMPLIFY_TOLERANCE_DEG);
   const out = [];
-  for (const [lng, lat] of simplified) {
+  for (const [lng, lat] of ring) {
     const p = [Number(lat.toFixed(COORD_DECIMALS)), Number(lng.toFixed(COORD_DECIMALS))];
     const prev = out[out.length - 1];
     if (!prev || prev[0] !== p[0] || prev[1] !== p[1]) out.push(p);
