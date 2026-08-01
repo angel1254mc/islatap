@@ -49,8 +49,11 @@ export type Ring = LatLngTuple[];
 /** Polygon parts → rings; within a part, ring 0 is the outer ring, the rest are holes. */
 export type MultiPolygon = Ring[][];
 
-/** Kilometers per degree of latitude (and of longitude at the equator). */
-const KM_PER_DEG = 111.32;
+/**
+ * Kilometers per degree of latitude (and of longitude at the equator). Derived
+ * from the same Earth radius as haversineKm so the two distance systems agree.
+ */
+const KM_PER_DEG = (2 * Math.PI * EARTH_RADIUS_KM) / 360;
 
 /** Even-odd ray cast across every ring; holes count out, parts count in. */
 export function pointInMultiPolygon(point: LatLng, shape: MultiPolygon): boolean {
