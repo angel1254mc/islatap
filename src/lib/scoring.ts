@@ -40,3 +40,87 @@ export function formatDistance(km: number): string {
   }
   return `${km.toFixed(1)} km`;
 }
+
+// ---------------------------------------------------------------- shapes
+
+/** [lat, lng] pair — matches Leaflet's LatLngTuple ordering. */
+export type LatLngTuple = [number, number];
+export type Ring = LatLngTuple[];
+/** Polygon parts → rings; within a part, ring 0 is the outer ring, the rest are holes. */
+export type MultiPolygon = Ring[][];
+
+/** Kilometers per degree of latitude (and of longitude at the equator). */
+const KM_PER_DEG = 111.32;
+
+/** Even-odd ray cast across every ring; holes count out, parts count in. */
+export function pointInMultiPolygon(point: LatLng, shape: MultiPolygon): boolean {
+  let inside = false;
+  for (const part of shape) {
+    for (const ring of part) {
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [latI, lngI] = ring[i];
+        const [latJ, lngJ] = ring[j];
+        if (
+          latI > point.lat !== latJ > point.lat &&
+          point.lng < ((lngJ - lngI) * (point.lat - latI)) / (latJ - latI) + lngI
+        ) {
+          inside = !inside;
+        }
+      }
+    }
+  }
+  return inside;
+}
+
+/**
+ * Nearest point on a segment in a local equirectangular plane. Adequate at
+ * Puerto Rico scale (< 0.1% error) and, unlike haversine-per-vertex, gives
+ * the projected point back for drawing.
+ */
+function segmentNearest(
+  point: LatLng,
+  a: LatLngTuple,
+  b: LatLngTuple,
+): { distanceKm: number; at: LatLng } {
+  const cosLat = Math.cos((point.lat * Math.PI) / 180);
+  const ax = a[1] * cosLat;
+  const ay = a[0];
+  const bx = b[1] * cosLat;
+  const by = b[0];
+  const px = point.lng * cosLat;
+  const py = point.lat;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSq = dx * dx + dy * dy;
+  const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
+  const distanceKm = Math.hypot(px - (ax + t * dx), py - (ay + t * dy)) * KM_PER_DEG;
+  return {
+    distanceKm,
+    at: { lat: a[0] + t * (b[0] - a[0]), lng: a[1] + t * (b[1] - a[1]) },
+  };
+}
+
+/** Closest boundary point across all rings (holes included — their edge is a border too). */
+export function nearestPointOnShape(
+  point: LatLng,
+  shape: MultiPolygon,
+): { point: LatLng; distanceKm: number } {
+  let best: { point: LatLng; distanceKm: number } = { point, distanceKm: Infinity };
+  for (const part of shape) {
+    for (const ring of part) {
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const candidate = segmentNearest(point, ring[j], ring[i]);
+        if (candidate.distanceKm < best.distanceKm) {
+          best = { point: candidate.at, distanceKm: candidate.distanceKm };
+        }
+      }
+    }
+  }
+  return best;
+}
+
+/** 0 inside the shape, otherwise distance to the nearest boundary, in km. */
+export function distanceToShapeKm(point: LatLng, shape: MultiPolygon): number {
+  if (pointInMultiPolygon(point, shape)) return 0;
+  return nearestPointOnShape(point, shape).distanceKm;
+}
