@@ -17,5 +17,5 @@
     "types": ["vite/client"]
   },
   "include": ["src", "vite.config.ts"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+  "exclude": ["src/data/shapes-dataset.test.ts"]
 }
