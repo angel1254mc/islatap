@@ -61,6 +61,14 @@ describe('public/shapes-pr.json', () => {
     expect(shapes['721277969319927']).toBeDefined(); // Condado subbarrio
   });
 
+  it('gives every curated municipio a county shape', () => {
+    const shapes = loadShapes();
+    const missing = LOCATIONS.filter(
+      (l) => l.category === 'municipio' && (!l.geoid || !shapes[l.geoid]),
+    ).map((l) => l.name);
+    expect(missing).toEqual([]);
+  });
+
   it('stays under the size budget', () => {
     expect(statSync(SHAPES_PATH).size).toBeLessThan(3.5 * 1024 * 1024);
   });
