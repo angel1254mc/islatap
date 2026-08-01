@@ -1,4 +1,4 @@
-import { LOCATIONS, type Category, type GameLocation } from '../data/locations';
+import { LOCATIONS, displayName, type Category, type GameLocation } from '../data/locations';
 import { MAX_ROUND_POINTS, formatDistance, type LatLng } from './scoring';
 
 export const ROUNDS_PER_GAME = 5;
@@ -22,8 +22,13 @@ function shuffle<T>(items: readonly T[]): T[] {
 
 /**
  * Pick 5 distinct, category-varied locations: one guaranteed from each
- * category (municipio, landmark, barrio), the rest drawn from the whole pool,
- * then shuffled so the guaranteed picks don't always lead.
+ * category (municipio, landmark, barrio), then the remaining slots filled by
+ * drawing a category first and a location second, and finally shuffled so the
+ * guaranteed picks don't always lead.
+ *
+ * Filling per-category rather than from a flat pool matters: barrios outnumber
+ * everything else roughly 11:1 since the TIGER import, so a flat draw would make
+ * nearly every unguaranteed round an obscure rural barrio.
  */
 export function pickGameRounds(pool: readonly GameLocation[] = LOCATIONS): GameLocation[] {
   const byCategory = new Map<Category, GameLocation[]>();
@@ -41,11 +46,11 @@ export function pickGameRounds(pool: readonly GameLocation[] = LOCATIONS): GameL
     }
   }
 
-  const remaining = shuffle([...byCategory.values()].flat());
   while (picked.length < ROUNDS_PER_GAME) {
-    const location = remaining.shift();
-    if (!location) break;
-    picked.push(location);
+    const available = [...byCategory.values()].filter((bucket) => bucket.length > 0);
+    if (available.length === 0) break;
+    const bucket = available[Math.floor(Math.random() * available.length)];
+    picked.push(bucket.shift() as GameLocation);
   }
 
   return shuffle(picked);
@@ -85,7 +90,7 @@ export function buildShareText(outcomes: readonly RoundOutcome[], total: number)
   const header = `IslaTap — ${total.toLocaleString('en-US')} / ${MAX_GAME_POINTS.toLocaleString('en-US')} 🇵🇷`;
   const lines = outcomes.map((outcome, index) => {
     const badge = ROUND_EMOJI[index] ?? `${index + 1}.`;
-    return `${badge} ${medalFor(outcome.points)} ${outcome.location.name} — ${formatDistance(outcome.distanceKm)} — ${outcome.points.toLocaleString('en-US')}`;
+    return `${badge} ${medalFor(outcome.points)} ${displayName(outcome.location)} — ${formatDistance(outcome.distanceKm)} — ${outcome.points.toLocaleString('en-US')}`;
   });
   return [header, ...lines].join('\n');
 }

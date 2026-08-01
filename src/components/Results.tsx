@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MAX_GAME_POINTS, buildShareText, type RoundOutcome } from '../lib/game';
 import { formatDistance } from '../lib/scoring';
+import { displayName } from '../data/locations';
 
 interface ResultsProps {
   outcomes: RoundOutcome[];
@@ -72,8 +73,8 @@ export default function Results({
                 <tr key={outcome.location.id}>
                   <td>{index + 1}</td>
                   <td className="results__place">
-                    {outcome.location.name}
-                    <small>{outcome.location.category}</small>
+                    {displayName(outcome.location)}
+                    <small>{outcome.location.subtype}</small>
                   </td>
                   <td>{formatDistance(outcome.distanceKm)}</td>
                   <td className="results__points-col">
