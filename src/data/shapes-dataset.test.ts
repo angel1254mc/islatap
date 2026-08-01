@@ -72,4 +72,11 @@ describe('public/shapes-pr.json', () => {
   it('stays under the size budget', () => {
     expect(statSync(SHAPES_PATH).size).toBeLessThan(3.5 * 1024 * 1024);
   });
+
+  it('never lets two locations share a geoid (the same polygon would be promptable twice)', () => {
+    const geoids = LOCATIONS.map((l) => l.geoid).filter((g): g is string => Boolean(g));
+    const seen = new Set<string>();
+    const duplicates = geoids.filter((g) => (seen.has(g) ? true : (seen.add(g), false)));
+    expect([...new Set(duplicates)]).toEqual([]);
+  });
 });

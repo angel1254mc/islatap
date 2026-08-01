@@ -401,13 +401,22 @@ const taken = new Set();
 for (const m of curatedSrc.matchAll(/name:\s*'((?:[^'\\]|\\.)*)'[^}]*?municipio:\s*(?:'((?:[^'\\]|\\.)*)'|null)/g)) {
   taken.add(`${fold(m[1].replace(/\\'/g, "'"))}|${m[2] ? fold(m[2].replace(/\\'/g, "'")) : ''}`);
 }
+// A curated row can also duplicate a generated row's *shape* while using a different
+// display name — e.g. curated 'Viejo San Juan' (7212776812) is the same polygon as
+// generated 'San Juan Antiguo', and curated 'Playa de Ponce' (7211362751) is the same
+// polygon as generated 'Playa, Ponce'. The name+municipio key above misses these, so
+// dedup on curated geoid too.
+const curatedGeoids = new Set();
+for (const m of curatedSrc.matchAll(/geoid:\s*'(\d+)'/g)) {
+  curatedGeoids.add(m[1]);
+}
 
 const RANK = { barrio: 0, 'barrio-pueblo': 1, comunidad: 2 };
 const dropCounts = {};
 const deduped = [];
 for (const e of [...entries].sort((a, b) => RANK[a.subtype] - RANK[b.subtype])) {
   const key = `${fold(e.name)}|${fold(e.municipio ?? '')}`;
-  if (taken.has(key)) {
+  if (taken.has(key) || curatedGeoids.has(e.geoid)) {
     dropCounts[e.subtype] = (dropCounts[e.subtype] ?? 0) + 1;
     continue;
   }
