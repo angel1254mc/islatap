@@ -73,6 +73,18 @@ describe('public/shapes-pr.json', () => {
     expect(statSync(SHAPES_PATH).size).toBeLessThan(3.5 * 1024 * 1024);
   });
 
+  it('uses shoreline-clipped boundaries, not legal ones that extend into the ocean', () => {
+    // TIGER/Line ships LEGAL boundaries: coastal units include territorial water
+    // (Isabela's county polygon reached ~5.7 km into the Atlantic). Shapes must come
+    // from the cartographic-boundary (cb_*_500k) files instead. These two anchors are
+    // the shoreline latitudes from cb 2022; regressing to TIGER geometry breaks both.
+    const shapes = loadShapes();
+    const maxLat = (shape: MultiPolygon) =>
+      Math.max(...shape.flatMap((part) => part.flatMap((ring) => ring.map(([lat]) => lat))));
+    expect(maxLat(shapes['72071'])).toBeLessThan(18.52); // Isabela municipio (TIGER: 18.568)
+    expect(maxLat(shapes['7208783133'])).toBeLessThan(18.462); // Torrecilla Baja, Loíza (TIGER: 18.4656)
+  });
+
   it('never lets two locations share a geoid (the same polygon would be promptable twice)', () => {
     const geoids = LOCATIONS.map((l) => l.geoid).filter((g): g is string => Boolean(g));
     const seen = new Set<string>();

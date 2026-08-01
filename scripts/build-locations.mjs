@@ -30,9 +30,19 @@ const BASE = 'https://www2.census.gov/geo/tiger/TIGER2022';
 const SOURCES = {
   cousub: `${BASE}/COUSUB/tl_2022_72_cousub.zip`,
   place: `${BASE}/PLACE/tl_2022_72_place.zip`,
-  // National file (~80 MB) — only source of county polygons; cached after first run.
-  county: `${BASE}/COUNTY/tl_2022_us_county.zip`,
-  subbarrio: `${BASE}/SUBBARRIO/tl_2022_72_subbarrio.zip`,
+};
+
+// Boundary SHAPES come from the cartographic-boundary files, NOT TIGER/Line.
+// TIGER ships legal boundaries: coastal units include territorial water (Isabela's
+// county polygon reached ~5.7 km into the Atlantic; Torrecilla Baja in Loíza is 37%
+// water). The cb_*_500k files are the same units clipped to the shoreline — and the
+// county file is 11 MB instead of TIGER's 80 MB.
+const CB_BASE = 'https://www2.census.gov/geo/tiger/GENZ2022/shp';
+const CB_SOURCES = {
+  county: `${CB_BASE}/cb_2022_us_county_500k.zip`,
+  cousub: `${CB_BASE}/cb_2022_72_cousub_500k.zip`,
+  place: `${CB_BASE}/cb_2022_72_place_500k.zip`,
+  subbarrio: `${CB_BASE}/cb_2022_72_subbarrio_500k.zip`,
 };
 const SHAPES_OUT = join(ROOT, 'public', 'shapes-pr.json');
 
@@ -475,25 +485,24 @@ console.log(`
 
 // ---------------------------------------------------------------- shapes-pr.json
 
-console.log('Emitting shapes…');
-const countyZip = unzip(await fetchCached('county.zip', SOURCES.county));
-const subbarrioZip = unzip(await fetchCached('subbarrio.zip', SOURCES.subbarrio));
+console.log('Emitting shapes (cartographic boundaries, shoreline-clipped)…');
 
-const countyRows = readDbf(countyZip.get('tl_2022_us_county.dbf'));
-const countyShapes = readPolygons(countyZip.get('tl_2022_us_county.shp'));
-const subbarrioRows = readDbf(subbarrioZip.get('tl_2022_72_subbarrio.dbf'));
-const subbarrioShapes = readPolygons(subbarrioZip.get('tl_2022_72_subbarrio.shp'));
-const placeShapes = readPolygons(placeZip.get('tl_2022_72_place.shp'));
+/** Load a cb_* layer: parallel arrays of dbf rows and parsed polygon records. */
+async function loadCbLayer(cacheName, url) {
+  const zip = unzip(await fetchCached(cacheName, url));
+  const stem = [...zip.keys()].find((n) => n.endsWith('.shp')).slice(0, -4);
+  const rows = readDbf(zip.get(`${stem}.dbf`));
+  const shapes = readPolygons(zip.get(`${stem}.shp`));
+  if (rows.length !== shapes.length) {
+    throw new Error(`${cacheName} .dbf/.shp record mismatch: ${rows.length} vs ${shapes.length}`);
+  }
+  return { rows, shapes };
+}
 
-if (countyRows.length !== countyShapes.length) {
-  throw new Error(`county .dbf/.shp record mismatch: ${countyRows.length} vs ${countyShapes.length}`);
-}
-if (subbarrioRows.length !== subbarrioShapes.length) {
-  throw new Error(`subbarrio .dbf/.shp record mismatch: ${subbarrioRows.length} vs ${subbarrioShapes.length}`);
-}
-if (placeRows.length !== placeShapes.length) {
-  throw new Error(`place .dbf/.shp record mismatch: ${placeRows.length} vs ${placeShapes.length}`);
-}
+const cbCounty = await loadCbLayer('cb-county.zip', CB_SOURCES.county);
+const cbCousub = await loadCbLayer('cb-cousub.zip', CB_SOURCES.cousub);
+const cbPlace = await loadCbLayer('cb-place.zip', CB_SOURCES.place);
+const cbSubbarrio = await loadCbLayer('cb-subbarrio.zip', CB_SOURCES.subbarrio);
 
 const shapesOut = {};
 let skipped = 0;
@@ -503,14 +512,12 @@ const emitShape = (geoid, shape) => {
   else skipped++;
 };
 
-countyRows.forEach((row, i) => {
-  if (row.STATEFP === '72') emitShape(row.GEOID, countyShapes[i]);
+cbCounty.rows.forEach((row, i) => {
+  if (row.STATEFP === '72') emitShape(row.GEOID, cbCounty.shapes[i]);
 });
-for (const { row, shape } of barrioRows) emitShape(row.GEOID, shape);
-placeRows.forEach((row, i) => {
-  if (row.LSAD === '55') emitShape(row.GEOID, placeShapes[i]);
-});
-subbarrioRows.forEach((row, i) => emitShape(row.GEOID, subbarrioShapes[i]));
+for (const layer of [cbCousub, cbPlace, cbSubbarrio]) {
+  layer.rows.forEach((row, i) => emitShape(row.GEOID, layer.shapes[i]));
+}
 
 const shapesJson = JSON.stringify(shapesOut);
 await writeFile(SHAPES_OUT, shapesJson, 'utf8');
