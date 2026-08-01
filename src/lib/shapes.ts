@@ -37,6 +37,28 @@ export function getShape(geoid: string | undefined): MultiPolygon | undefined {
   return isMultiPolygon ? value : undefined;
 }
 
+export type ShapeLayer = 'municipio' | 'barrio' | 'comunidad' | 'subbarrio' | 'all';
+
+// GEOID length encodes the Census layer: 5 county, 7 place, 10 cousub, 15 subbarrio.
+const LAYER_GEOID_LENGTH: Record<Exclude<ShapeLayer, 'all'>, number> = {
+  municipio: 5,
+  comunidad: 7,
+  barrio: 10,
+  subbarrio: 15,
+};
+
+/**
+ * Every loaded shape in one layer — the ?debug=shapes overlay. Empty until the
+ * background load finishes (callers re-render on startShapeLoad() resolution).
+ */
+export function getShapesByLayer(layer: ShapeLayer): Array<[string, MultiPolygon]> {
+  if (!shapes) return [];
+  const entries = Object.entries(shapes);
+  if (layer === 'all') return entries;
+  const length = LAYER_GEOID_LENGTH[layer];
+  return entries.filter(([geoid]) => geoid.length === length);
+}
+
 export function resetShapesForTest(): void {
   shapes = null;
   loadPromise = null;

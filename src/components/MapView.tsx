@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import L from 'leaflet';
 import {
   MapContainer,
@@ -14,6 +14,7 @@ import {
 import 'leaflet/dist/leaflet.css';
 import type { GameLocation } from '../data/locations';
 import { haversineKm, nearestPointOnShape, type MultiPolygon, type LatLng } from '../lib/scoring';
+import { getShapesByLayer, startShapeLoad, type ShapeLayer } from '../lib/shapes';
 
 // Base imagery is isolated here so the provider can be swapped later.
 const BASE_LAYER_URL =
@@ -28,6 +29,49 @@ const INITIAL_CENTER: L.LatLngTuple = [18.22, -66.35];
 const INITIAL_ZOOM = 9;
 const MIN_ZOOM = 9;
 const MAX_ZOOM = 16;
+
+// Boundary QA overlay: ?debug=shapes renders every municipio outline at once so
+// edge alignment between neighbors can be eyeballed against the imagery;
+// &layer=barrio|comunidad|subbarrio|all switches the Census layer. Read once at
+// module load — it's a URL-only debug tool with no game-state interaction.
+const DEBUG_QUERY = new URLSearchParams(window.location.search);
+const DEBUG_SHAPES = DEBUG_QUERY.get('debug') === 'shapes';
+const DEBUG_LAYERS: readonly ShapeLayer[] = ['municipio', 'barrio', 'comunidad', 'subbarrio', 'all'];
+const DEBUG_LAYER: ShapeLayer = (DEBUG_LAYERS as readonly string[]).includes(
+  DEBUG_QUERY.get('layer') ?? '',
+)
+  ? (DEBUG_QUERY.get('layer') as ShapeLayer)
+  : 'municipio';
+
+function DebugShapesOverlay() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    void startShapeLoad().then(() => {
+      if (mounted) setReady(true);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!ready) return null;
+  return (
+    <>
+      {getShapesByLayer(DEBUG_LAYER).map(([geoid, shape]) =>
+        shape.map((part, index) => (
+          <Polygon
+            key={`${geoid}-${index}`}
+            positions={part}
+            interactive={false}
+            pathOptions={{ color: '#38bdf8', weight: 1, fillColor: '#38bdf8', fillOpacity: 0.04 }}
+          />
+        )),
+      )}
+    </>
+  );
+}
 
 // Leaflet's default icon URLs break under bundlers, so pins are explicit
 // divIcons with inline SVG instead.
@@ -152,6 +196,7 @@ export default function MapView({
         <TileLayer url={BASE_LAYER_URL} attribution={BASE_LAYER_ATTRIBUTION} />
         <ZoomControl position="bottomleft" />
         <ClickHandler enabled={interactive} onGuess={onGuess} />
+        {DEBUG_SHAPES && <DebugShapesOverlay />}
         <ViewController
           roundIndex={roundIndex}
           revealed={revealed}

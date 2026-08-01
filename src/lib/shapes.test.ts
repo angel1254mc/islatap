@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MultiPolygon } from './scoring';
-import { getShape, resetShapesForTest, startShapeLoad } from './shapes';
+import { getShape, getShapesByLayer, resetShapesForTest, startShapeLoad } from './shapes';
 
 const SQUARE: MultiPolygon = [
   [
@@ -62,5 +62,38 @@ describe('shapes loader', () => {
     );
     await startShapeLoad();
     expect(getShape('72127')).toBeUndefined();
+  });
+});
+
+describe('getShapesByLayer', () => {
+  // GEOID length encodes the Census layer: 5 county, 7 place, 10 cousub, 15 subbarrio.
+  const LOADED = {
+    '72127': SQUARE, //            municipio (county)
+    '7241767': SQUARE, //          comunidad (place)
+    '7212779693': SQUARE, //       barrio (cousub)
+    '721277969319927': SQUARE, //  subbarrio
+  };
+
+  async function loadFixture() {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => LOADED }));
+    await startShapeLoad();
+  }
+
+  it('returns an empty list before any load', () => {
+    expect(getShapesByLayer('municipio')).toEqual([]);
+    expect(getShapesByLayer('all')).toEqual([]);
+  });
+
+  it('buckets each layer by geoid length', async () => {
+    await loadFixture();
+    expect(getShapesByLayer('municipio').map(([g]) => g)).toEqual(['72127']);
+    expect(getShapesByLayer('comunidad').map(([g]) => g)).toEqual(['7241767']);
+    expect(getShapesByLayer('barrio').map(([g]) => g)).toEqual(['7212779693']);
+    expect(getShapesByLayer('subbarrio').map(([g]) => g)).toEqual(['721277969319927']);
+  });
+
+  it('returns everything for the all layer', async () => {
+    await loadFixture();
+    expect(getShapesByLayer('all')).toHaveLength(4);
   });
 });
