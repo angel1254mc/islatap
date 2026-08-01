@@ -30,7 +30,11 @@ const BASE = 'https://www2.census.gov/geo/tiger/TIGER2022';
 const SOURCES = {
   cousub: `${BASE}/COUSUB/tl_2022_72_cousub.zip`,
   place: `${BASE}/PLACE/tl_2022_72_place.zip`,
+  // National file (~80 MB) — only source of county polygons; cached after first run.
+  county: `${BASE}/COUNTY/tl_2022_us_county.zip`,
+  subbarrio: `${BASE}/SUBBARRIO/tl_2022_72_subbarrio.zip`,
 };
+const SHAPES_OUT = join(ROOT, 'public', 'shapes-pr.json');
 
 // Every municipio has a barrio-pueblo named after it, so including them would emit 74
 // near-duplicates of the municipio rounds ("Cabo Rojo" the pueblo vs "Cabo Rojo" the
@@ -196,6 +200,107 @@ function pointInShape(shape, x, y) {
   return inside;
 }
 
+// ------------------------------------------------------- shape emission
+
+// Simplification happens in a locally-scaled plane so tolerance is isotropic.
+const LNG_SCALE = Math.cos((18.22 * Math.PI) / 180); // PR mid-latitude
+const SIMPLIFY_TOLERANCE_DEG = 0.00055; // \u2248 60 m \u2014 invisible at reveal zoom
+const COORD_DECIMALS = 5; // ~1 m
+
+function perpendicularDist(p, a, b) {
+  const ax = a[0] * LNG_SCALE, ay = a[1];
+  const bx = b[0] * LNG_SCALE, by = b[1];
+  const px = p[0] * LNG_SCALE, py = p[1];
+  const dx = bx - ax, dy = by - ay;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq === 0) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+/** Classic Douglas\u2013Peucker. Ring endpoints coincide, which degrades the first
+ *  split to radial distance from the start point \u2014 fine for closed rings. */
+function douglasPeucker(points, tolerance) {
+  if (points.length <= 2) return points;
+  let maxDist = 0;
+  let maxIdx = 0;
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = perpendicularDist(points[i], points[0], points[points.length - 1]);
+    if (d > maxDist) { maxDist = d; maxIdx = i; }
+  }
+  if (maxDist <= tolerance) return [points[0], points[points.length - 1]];
+  const left = douglasPeucker(points.slice(0, maxIdx + 1), tolerance);
+  const right = douglasPeucker(points.slice(maxIdx), tolerance);
+  return [...left.slice(0, -1), ...right];
+}
+
+/** Shoelace area; positive = counter-clockwise in the lng/lat plane. */
+function shoelace(ring) {
+  let sum = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    sum += ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
+  }
+  return sum / 2;
+}
+
+function pointInRing(pt, ring) {
+  let inside = false;
+  const [x, y] = pt;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** Simplify one [lng,lat] ring \u2192 rounded, deduped [lat,lng] ring (or null if collapsed). */
+function toOutputRing(ring) {
+  const simplified = douglasPeucker(ring, SIMPLIFY_TOLERANCE_DEG);
+  const out = [];
+  for (const [lng, lat] of simplified) {
+    const p = [Number(lat.toFixed(COORD_DECIMALS)), Number(lng.toFixed(COORD_DECIMALS))];
+    const prev = out[out.length - 1];
+    if (!prev || prev[0] !== p[0] || prev[1] !== p[1]) out.push(p);
+  }
+  // Re-close if rounding merged the closing duplicate away.
+  const first = out[0];
+  const last = out[out.length - 1];
+  if (out.length >= 3 && (first[0] !== last[0] || first[1] !== last[1])) out.push([first[0], first[1]]);
+  return out.length >= 4 ? out : null;
+}
+
+/**
+ * Shapefile record \u2192 MultiPolygon ([lat,lng], parts \u2192 [outer, ...holes]).
+ * Shapefile winding: clockwise = outer (negative shoelace), counter-clockwise = hole.
+ */
+function shapeToMultiPolygon(shape) {
+  if (!shape) return null;
+  const outers = [];
+  const holes = [];
+  for (const ring of shape.rings) {
+    (shoelace(ring) < 0 ? outers : holes).push(ring);
+  }
+  if (outers.length === 0) return null;
+  const grouped = outers.map((outer) => [outer]);
+  for (const hole of holes) {
+    const idx = outers.findIndex((outer) => pointInRing(hole[0], outer));
+    if (idx >= 0) grouped[idx].push(hole); // orphan holes are degenerate data \u2014 dropped
+  }
+  const parts = [];
+  for (const rings of grouped) {
+    const outer = toOutputRing(rings[0]);
+    if (!outer) continue; // outer collapsed \u2192 its holes go with it
+    const part = [outer];
+    for (const hole of rings.slice(1)) {
+      const simplifiedHole = toOutputRing(hole);
+      if (simplifiedHole) part.push(simplifiedHole);
+    }
+    parts.push(part);
+  }
+  return parts.length > 0 ? parts : null;
+}
+
 // ---------------------------------------------------------------- helpers
 
 const fold = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -357,4 +462,50 @@ console.log(`
   deduped             ${dropped}  (${Object.entries(dropCounts).map(([k, v]) => `${v} ${k}`).join(', ') || 'none'})
   written             ${deduped.length} -> src/data/tiger.generated.ts
   area p75            ${(p75 / 1e6).toFixed(2)} km² (>= is 'medium', below is 'hard')
+`);
+
+// ---------------------------------------------------------------- shapes-pr.json
+
+console.log('Emitting shapes…');
+const countyZip = unzip(await fetchCached('county.zip', SOURCES.county));
+const subbarrioZip = unzip(await fetchCached('subbarrio.zip', SOURCES.subbarrio));
+
+const countyRows = readDbf(countyZip.get('tl_2022_us_county.dbf'));
+const countyShapes = readPolygons(countyZip.get('tl_2022_us_county.shp'));
+const subbarrioRows = readDbf(subbarrioZip.get('tl_2022_72_subbarrio.dbf'));
+const subbarrioShapes = readPolygons(subbarrioZip.get('tl_2022_72_subbarrio.shp'));
+const placeShapes = readPolygons(placeZip.get('tl_2022_72_place.shp'));
+
+if (countyRows.length !== countyShapes.length) {
+  throw new Error(`county .dbf/.shp record mismatch: ${countyRows.length} vs ${countyShapes.length}`);
+}
+if (subbarrioRows.length !== subbarrioShapes.length) {
+  throw new Error(`subbarrio .dbf/.shp record mismatch: ${subbarrioRows.length} vs ${subbarrioShapes.length}`);
+}
+if (placeRows.length !== placeShapes.length) {
+  throw new Error(`place .dbf/.shp record mismatch: ${placeRows.length} vs ${placeShapes.length}`);
+}
+
+const shapesOut = {};
+let skipped = 0;
+const emitShape = (geoid, shape) => {
+  const multi = shapeToMultiPolygon(shape);
+  if (multi) shapesOut[geoid] = multi;
+  else skipped++;
+};
+
+countyRows.forEach((row, i) => {
+  if (row.STATEFP === '72') emitShape(row.GEOID, countyShapes[i]);
+});
+for (const { row, shape } of barrioRows) emitShape(row.GEOID, shape);
+placeRows.forEach((row, i) => {
+  if (row.LSAD === '55') emitShape(row.GEOID, placeShapes[i]);
+});
+subbarrioRows.forEach((row, i) => emitShape(row.GEOID, subbarrioShapes[i]));
+
+const shapesJson = JSON.stringify(shapesOut);
+await writeFile(SHAPES_OUT, shapesJson, 'utf8');
+console.log(`
+  shapes emitted      ${Object.keys(shapesOut).length}${skipped ? `  (${skipped} degenerate skipped)` : ''}
+  shapes-pr.json      ${(shapesJson.length / 1024 / 1024).toFixed(2)} MB -> public/shapes-pr.json
 `);
