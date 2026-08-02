@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   DISTANCE_DECAY_KM,
   MAX_ROUND_POINTS,
+  distanceToCircleKm,
   formatDistance,
   haversineKm,
-  pointTowardKm,
+  nearestPointOnCircle,
   scoreForDistance,
 } from './scoring';
 
@@ -61,17 +62,30 @@ describe('scoreForDistance', () => {
   });
 });
 
-describe('pointTowardKm', () => {
-  it('lands the requested distance from the origin, on the line to the target', () => {
-    const step = pointTowardKm(SAN_JUAN, PONCE, 0.5);
-    expect(haversineKm(SAN_JUAN, step)).toBeCloseTo(0.5, 3);
-    // Still heading toward Ponce: south and west of San Juan.
-    expect(step.lat).toBeLessThan(SAN_JUAN.lat);
-    expect(step.lng).toBeLessThan(SAN_JUAN.lng);
+describe('distanceToCircleKm', () => {
+  it('is 0 anywhere inside the circle', () => {
+    expect(distanceToCircleKm(SAN_JUAN, SAN_JUAN, 0.05)).toBe(0);
+    const nearby = { lat: SAN_JUAN.lat + 0.0001, lng: SAN_JUAN.lng }; // ~11 m north
+    expect(distanceToCircleKm(nearby, SAN_JUAN, 0.05)).toBe(0);
   });
 
-  it('returns the origin when the two points coincide', () => {
-    expect(pointTowardKm(SAN_JUAN, SAN_JUAN, 0.05)).toEqual(SAN_JUAN);
+  it('measures from the edge, not the center, outside', () => {
+    const centerDistance = haversineKm(PONCE, SAN_JUAN);
+    expect(distanceToCircleKm(PONCE, SAN_JUAN, 0.5)).toBeCloseTo(centerDistance - 0.5, 6);
+  });
+});
+
+describe('nearestPointOnCircle', () => {
+  it('lands on the circle edge, on the line toward the outside point', () => {
+    const edge = nearestPointOnCircle(PONCE, SAN_JUAN, 0.5);
+    expect(haversineKm(SAN_JUAN, edge)).toBeCloseTo(0.5, 3);
+    // Heading toward Ponce: south and west of the San Juan center.
+    expect(edge.lat).toBeLessThan(SAN_JUAN.lat);
+    expect(edge.lng).toBeLessThan(SAN_JUAN.lng);
+  });
+
+  it('returns the center when the point sits exactly on it', () => {
+    expect(nearestPointOnCircle(SAN_JUAN, SAN_JUAN, 0.05)).toEqual(SAN_JUAN);
   });
 });
 

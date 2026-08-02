@@ -16,8 +16,8 @@ import 'leaflet/dist/leaflet.css';
 import type { GameLocation } from '../data/locations';
 import {
   haversineKm,
+  nearestPointOnCircle,
   nearestPointOnShape,
-  pointTowardKm,
   type MultiPolygon,
   type LatLng,
 } from '../lib/scoring';
@@ -202,7 +202,7 @@ export default function MapView({
       ? targetShape
         ? nearestPointOnShape(guess, targetShape).point
         : targetRadiusKm
-          ? pointTowardKm(target, guess, targetRadiusKm)
+          ? nearestPointOnCircle(guess, target, targetRadiusKm)
           : { lat: target.lat, lng: target.lng }
       : null;
 

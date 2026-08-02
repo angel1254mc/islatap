@@ -2,9 +2,9 @@ import { LOCATIONS, displayName, type Category, type GameLocation } from '../dat
 import {
   DEFAULT_ACCEPT_RADIUS_KM,
   MAX_ROUND_POINTS,
+  distanceToCircleKm,
   distanceToShapeKm,
   formatDistance,
-  haversineKm,
   pointInMultiPolygon,
   scoreForDistance,
   type LatLng,
@@ -59,7 +59,7 @@ export function evaluateGuess(
     };
   }
   const acceptRadiusKm = location.radiusKm ?? DEFAULT_ACCEPT_RADIUS_KM;
-  const distanceKm = Math.max(0, haversineKm(guess, location) - acceptRadiusKm);
+  const distanceKm = distanceToCircleKm(guess, location, acceptRadiusKm);
   return {
     location,
     guess,

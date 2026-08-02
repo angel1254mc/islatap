@@ -135,17 +135,25 @@ export function distanceToShapeKm(point: LatLng, shape: MultiPolygon): number {
   return nearestPointOnShape(point, shape).distanceKm;
 }
 
+// Acceptance-circle analogues of the shape helpers above, so callers handling
+// the shape-vs-radius split use the same vocabulary for both geometries.
+
+/** 0 inside the acceptance circle, otherwise distance beyond its edge, in km. */
+export function distanceToCircleKm(point: LatLng, center: LatLng, radiusKm: number): number {
+  return Math.max(0, haversineKm(point, center) - radiusKm);
+}
+
 /**
- * The point `km` away from `from` in the direction of `toward`, in the local
- * equirectangular plane — used to land the reveal line on an acceptance
- * circle's edge rather than its center. Returns `from` if the two coincide.
+ * Closest point on the circle's edge to `point`, in the local equirectangular
+ * plane — used to land the reveal line on the edge rather than the center.
+ * Returns the center if `point` sits exactly on it (direction is undefined).
  */
-export function pointTowardKm(from: LatLng, toward: LatLng, km: number): LatLng {
-  const cosLat = Math.cos((from.lat * Math.PI) / 180);
-  const dx = (toward.lng - from.lng) * cosLat;
-  const dy = toward.lat - from.lat;
+export function nearestPointOnCircle(point: LatLng, center: LatLng, radiusKm: number): LatLng {
+  const cosLat = Math.cos((center.lat * Math.PI) / 180);
+  const dx = (point.lng - center.lng) * cosLat;
+  const dy = point.lat - center.lat;
   const lengthDeg = Math.hypot(dx, dy);
-  if (lengthDeg === 0) return { lat: from.lat, lng: from.lng };
-  const t = km / KM_PER_DEG / lengthDeg;
-  return { lat: from.lat + dy * t, lng: from.lng + (toward.lng - from.lng) * t };
+  if (lengthDeg === 0) return { lat: center.lat, lng: center.lng };
+  const t = radiusKm / KM_PER_DEG / lengthDeg;
+  return { lat: center.lat + dy * t, lng: center.lng + (point.lng - center.lng) * t };
 }
