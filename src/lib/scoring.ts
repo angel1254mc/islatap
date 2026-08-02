@@ -27,6 +27,13 @@ export function haversineKm(a: LatLng, b: LatLng): number {
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
 }
 
+/**
+ * Acceptance radius for point-only locations (no boundary shape), in km.
+ * A guess inside the circle scores full marks; decay starts at its edge,
+ * mirroring how shaped locations decay from the polygon boundary.
+ */
+export const DEFAULT_ACCEPT_RADIUS_KM = 0.05;
+
 /** Points for a guess `distanceKm` away from the target, clamped to [0, MAX_ROUND_POINTS]. */
 export function scoreForDistance(distanceKm: number): number {
   const raw = Math.round(MAX_ROUND_POINTS * Math.exp(-distanceKm / DISTANCE_DECAY_KM));
@@ -126,4 +133,19 @@ export function nearestPointOnShape(
 export function distanceToShapeKm(point: LatLng, shape: MultiPolygon): number {
   if (pointInMultiPolygon(point, shape)) return 0;
   return nearestPointOnShape(point, shape).distanceKm;
+}
+
+/**
+ * The point `km` away from `from` in the direction of `toward`, in the local
+ * equirectangular plane — used to land the reveal line on an acceptance
+ * circle's edge rather than its center. Returns `from` if the two coincide.
+ */
+export function pointTowardKm(from: LatLng, toward: LatLng, km: number): LatLng {
+  const cosLat = Math.cos((from.lat * Math.PI) / 180);
+  const dx = (toward.lng - from.lng) * cosLat;
+  const dy = toward.lat - from.lat;
+  const lengthDeg = Math.hypot(dx, dy);
+  if (lengthDeg === 0) return { lat: from.lat, lng: from.lng };
+  const t = km / KM_PER_DEG / lengthDeg;
+  return { lat: from.lat + dy * t, lng: from.lng + (toward.lng - from.lng) * t };
 }

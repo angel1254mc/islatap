@@ -4,6 +4,7 @@ import {
   MAX_ROUND_POINTS,
   formatDistance,
   haversineKm,
+  pointTowardKm,
   scoreForDistance,
 } from './scoring';
 
@@ -57,6 +58,20 @@ describe('scoreForDistance', () => {
       expect(p).toBeGreaterThanOrEqual(0);
       expect(p).toBeLessThanOrEqual(MAX_ROUND_POINTS);
     }
+  });
+});
+
+describe('pointTowardKm', () => {
+  it('lands the requested distance from the origin, on the line to the target', () => {
+    const step = pointTowardKm(SAN_JUAN, PONCE, 0.5);
+    expect(haversineKm(SAN_JUAN, step)).toBeCloseTo(0.5, 3);
+    // Still heading toward Ponce: south and west of San Juan.
+    expect(step.lat).toBeLessThan(SAN_JUAN.lat);
+    expect(step.lng).toBeLessThan(SAN_JUAN.lng);
+  });
+
+  it('returns the origin when the two points coincide', () => {
+    expect(pointTowardKm(SAN_JUAN, SAN_JUAN, 0.05)).toEqual(SAN_JUAN);
   });
 });
 

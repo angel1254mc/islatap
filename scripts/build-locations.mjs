@@ -495,6 +495,39 @@ for (const layer of [cbCousub, cbPlace, cbSubbarrio]) {
   layer.rows.forEach((row, i) => emitShape(row.GEOID, layer.shapes[i]));
 }
 
+// Curated umbrella entries that span several Census units get a merged shape
+// under a synthetic key. Keys are deliberately non-numeric so they can never
+// collide with a real GEOID (and match no debug-overlay layer length).
+const MERGED_SHAPES = {
+  // Hato Rey the colloquial district = Norte + Central + Sur barrios.
+  '72127-hato-rey': ['7212734027', '7212733984', '7212734070'],
+};
+for (const [key, geoids] of Object.entries(MERGED_SHAPES)) {
+  shapesOut[key] = geoids.flatMap((geoid) => {
+    const shape = shapesOut[geoid];
+    if (!shape) throw new Error(`merged shape ${key}: source geoid ${geoid} missing`);
+    return shape;
+  });
+}
+
+// Island landmarks reuse real geometry: the single part of the source
+// municipio's emitted shape whose outer ring contains the landmark point.
+// (Emitted rings are [lat, lng]; pointInRing is coordinate-order agnostic.)
+const EXTRACTED_SHAPES = {
+  '72147-isla-de-vieques': { from: '72147', at: [18.12805, -65.43351] },
+  '72049-isla-de-culebra': { from: '72049', at: [18.31468, -65.28294] },
+  '72097-isla-de-mona': { from: '72097', at: [18.08134, -67.8913] },
+  '72113-isla-caja-de-muertos': { from: '72113', at: [17.89469, -66.51989] },
+  '72097-isla-desecheo': { from: '72097', at: [18.38457, -67.48062] },
+};
+for (const [key, { from, at }] of Object.entries(EXTRACTED_SHAPES)) {
+  const source = shapesOut[from];
+  if (!source) throw new Error(`extracted shape ${key}: source geoid ${from} missing`);
+  const part = source.find((rings) => pointInRing(at, rings[0]));
+  if (!part) throw new Error(`extracted shape ${key}: no part of ${from} contains ${at}`);
+  shapesOut[key] = [part];
+}
+
 const shapesJson = JSON.stringify(shapesOut);
 await writeFile(SHAPES_OUT, shapesJson, 'utf8');
 console.log(`

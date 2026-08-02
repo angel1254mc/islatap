@@ -7,3 +7,4 @@ scripts/.tiger-cache/
 *.local
 
 .vercel
+tsconfig.tsbuildinfo
