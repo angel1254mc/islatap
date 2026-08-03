@@ -31,8 +31,20 @@ export interface GameLocation {
   subtype: Subtype;
   difficulty: Difficulty;
   source: Source;
-  /** Census GEOID, present only on TIGER-derived rows. */
+  /**
+   * Key into shapes-pr.json. Usually a Census GEOID; curated umbrella entries
+   * that span several Census units use a synthetic key (e.g. '72127-hato-rey')
+   * that the generator fills with a merged shape.
+   */
   geoid?: string;
+  /**
+   * Acceptance radius for locations with no boundary shape: a guess within
+   * this distance of the point scores full marks, and decay starts at the
+   * circle's edge. Defaults to DEFAULT_ACCEPT_RADIUS_KM (50 m); the shapeless
+   * colloquial barrios (Isla Verde, La Perla, Levittown, Piñones) widen it
+   * because they are areas, not points.
+   */
+  radiusKm?: number;
   lat: number;
   lng: number;
 }

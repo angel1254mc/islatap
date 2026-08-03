@@ -27,6 +27,13 @@ export function haversineKm(a: LatLng, b: LatLng): number {
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
 }
 
+/**
+ * Acceptance radius for point-only locations (no boundary shape), in km.
+ * A guess inside the circle scores full marks; decay starts at its edge,
+ * mirroring how shaped locations decay from the polygon boundary.
+ */
+export const DEFAULT_ACCEPT_RADIUS_KM = 0.05;
+
 /** Points for a guess `distanceKm` away from the target, clamped to [0, MAX_ROUND_POINTS]. */
 export function scoreForDistance(distanceKm: number): number {
   const raw = Math.round(MAX_ROUND_POINTS * Math.exp(-distanceKm / DISTANCE_DECAY_KM));
@@ -126,4 +133,27 @@ export function nearestPointOnShape(
 export function distanceToShapeKm(point: LatLng, shape: MultiPolygon): number {
   if (pointInMultiPolygon(point, shape)) return 0;
   return nearestPointOnShape(point, shape).distanceKm;
+}
+
+// Acceptance-circle analogues of the shape helpers above, so callers handling
+// the shape-vs-radius split use the same vocabulary for both geometries.
+
+/** 0 inside the acceptance circle, otherwise distance beyond its edge, in km. */
+export function distanceToCircleKm(point: LatLng, center: LatLng, radiusKm: number): number {
+  return Math.max(0, haversineKm(point, center) - radiusKm);
+}
+
+/**
+ * Closest point on the circle's edge to `point`, in the local equirectangular
+ * plane — used to land the reveal line on the edge rather than the center.
+ * Returns the center if `point` sits exactly on it (direction is undefined).
+ */
+export function nearestPointOnCircle(point: LatLng, center: LatLng, radiusKm: number): LatLng {
+  const cosLat = Math.cos((center.lat * Math.PI) / 180);
+  const dx = (point.lng - center.lng) * cosLat;
+  const dy = point.lat - center.lat;
+  const lengthDeg = Math.hypot(dx, dy);
+  if (lengthDeg === 0) return { lat: center.lat, lng: center.lng };
+  const t = radiusKm / KM_PER_DEG / lengthDeg;
+  return { lat: center.lat + dy * t, lng: center.lng + (point.lng - center.lng) * t };
 }

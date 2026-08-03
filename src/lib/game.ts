@@ -1,5 +1,15 @@
 import { LOCATIONS, displayName, type Category, type GameLocation } from '../data/locations';
-import { MAX_ROUND_POINTS, formatDistance, type LatLng, type MultiPolygon } from './scoring';
+import {
+  DEFAULT_ACCEPT_RADIUS_KM,
+  MAX_ROUND_POINTS,
+  distanceToCircleKm,
+  distanceToShapeKm,
+  formatDistance,
+  pointInMultiPolygon,
+  scoreForDistance,
+  type LatLng,
+  type MultiPolygon,
+} from './scoring';
 
 export const ROUNDS_PER_GAME = 5;
 export const MAX_GAME_POINTS = ROUNDS_PER_GAME * MAX_ROUND_POINTS;
@@ -18,6 +28,47 @@ export interface RoundOutcome {
    * shapes-pr.json finishes loading between tap and reveal).
    */
   shape: MultiPolygon | null;
+  /**
+   * Acceptance radius used when there was no shape (drawn as a circle on the
+   * reveal), or null when the round was scored against a shape.
+   */
+  acceptRadiusKm: number | null;
+}
+
+/**
+ * Score a guess. With a shape: inside = full marks, outside decays from the
+ * nearest boundary. Without one: a circle of `location.radiusKm` (default
+ * 50 m) around the point acts as the boundary — inside it is full marks, and
+ * decay starts at its edge, so point locations mirror shaped ones.
+ */
+export function evaluateGuess(
+  location: GameLocation,
+  guess: LatLng,
+  shape: MultiPolygon | null,
+): RoundOutcome {
+  if (shape) {
+    const distanceKm = distanceToShapeKm(guess, shape);
+    return {
+      location,
+      guess,
+      distanceKm,
+      points: scoreForDistance(distanceKm),
+      inside: pointInMultiPolygon(guess, shape),
+      shape,
+      acceptRadiusKm: null,
+    };
+  }
+  const acceptRadiusKm = location.radiusKm ?? DEFAULT_ACCEPT_RADIUS_KM;
+  const distanceKm = distanceToCircleKm(guess, location, acceptRadiusKm);
+  return {
+    location,
+    guess,
+    distanceKm,
+    points: scoreForDistance(distanceKm),
+    inside: distanceKm === 0,
+    shape: null,
+    acceptRadiusKm,
+  };
 }
 
 function shuffle<T>(items: readonly T[]): T[] {

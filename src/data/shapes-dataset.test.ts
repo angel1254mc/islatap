@@ -61,6 +61,38 @@ describe('public/shapes-pr.json', () => {
     expect(shapes['721277969319927']).toBeDefined(); // Condado subbarrio
   });
 
+  it('merges Hato Rey Norte + Central + Sur into the umbrella shape', () => {
+    const shapes = loadShapes();
+    const merged = shapes['72127-hato-rey'];
+    expect(merged).toBeDefined();
+    const sourceParts =
+      shapes['7212734027'].length + shapes['7212733984'].length + shapes['7212734070'].length;
+    expect(merged.length).toBe(sourceParts);
+  });
+
+  it('gives every island landmark a real single-island shape', () => {
+    // Each key is one part extracted from its municipio's shape — the part
+    // containing the landmark point — so the polygon is the island itself,
+    // never the whole multi-island municipio.
+    const shapes = loadShapes();
+    for (const key of [
+      '72147-isla-de-vieques',
+      '72049-isla-de-culebra',
+      '72097-isla-de-mona',
+      '72113-isla-caja-de-muertos',
+      '72097-isla-desecheo',
+    ]) {
+      expect(shapes[key], key).toBeDefined();
+      expect(shapes[key].length, `${key} should be a single island part`).toBe(1);
+    }
+  });
+
+  it('links curated Guavate to its official Census barrio', () => {
+    const guavate = LOCATIONS.find((l) => l.name === 'Guavate');
+    expect(guavate?.geoid).toBe('7203531834');
+    expect(loadShapes()['7203531834']).toBeDefined();
+  });
+
   it('gives every curated municipio a county shape', () => {
     const shapes = loadShapes();
     const missing = LOCATIONS.filter(

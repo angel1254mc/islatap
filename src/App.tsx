@@ -5,8 +5,8 @@ import RoundPrompt from './components/RoundPrompt';
 import RoundResult from './components/RoundResult';
 import StartScreen from './components/StartScreen';
 import type { GameLocation } from './data/locations';
-import { loadBestScore, pickGameRounds, saveBestScore, type RoundOutcome } from './lib/game';
-import { distanceToShapeKm, haversineKm, pointInMultiPolygon, scoreForDistance, type LatLng } from './lib/scoring';
+import { evaluateGuess, loadBestScore, pickGameRounds, saveBestScore, type RoundOutcome } from './lib/game';
+import type { LatLng } from './lib/scoring';
 import { getShape, startShapeLoad } from './lib/shapes';
 
 type Phase = 'start' | 'playing' | 'revealed' | 'results';
@@ -43,16 +43,8 @@ export default function App() {
   const handleGuess = useCallback(
     (guess: LatLng) => {
       if (phase !== 'playing' || !currentLocation) return;
-      const shape = getShape(currentLocation.geoid);
-      const inside = shape ? pointInMultiPolygon(guess, shape) : false;
-      const distanceKm = shape
-        ? distanceToShapeKm(guess, shape)
-        : haversineKm(guess, currentLocation);
-      const points = scoreForDistance(distanceKm);
-      setOutcomes((previous) => [
-        ...previous,
-        { location: currentLocation, guess, distanceKm, points, inside, shape: shape ?? null },
-      ]);
+      const shape = getShape(currentLocation.geoid) ?? null;
+      setOutcomes((previous) => [...previous, evaluateGuess(currentLocation, guess, shape)]);
       setPhase('revealed');
     },
     [phase, currentLocation],
@@ -82,6 +74,7 @@ export default function App() {
         guess={revealed && lastOutcome ? lastOutcome.guess : null}
         target={revealed && currentLocation ? currentLocation : null}
         targetShape={revealed && lastOutcome ? lastOutcome.shape : null}
+        targetRadiusKm={revealed && lastOutcome ? lastOutcome.acceptRadiusKm : null}
         inside={revealed && lastOutcome ? lastOutcome.inside : false}
         onGuess={handleGuess}
       />

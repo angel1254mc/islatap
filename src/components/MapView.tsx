@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import L from 'leaflet';
 import {
+  Circle,
   MapContainer,
   Marker,
   Polygon,
@@ -13,7 +14,13 @@ import {
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { GameLocation } from '../data/locations';
-import { haversineKm, nearestPointOnShape, type MultiPolygon, type LatLng } from '../lib/scoring';
+import {
+  haversineKm,
+  nearestPointOnCircle,
+  nearestPointOnShape,
+  type MultiPolygon,
+  type LatLng,
+} from '../lib/scoring';
 import { getShapesByLayer, startShapeLoad, type ShapeLayer } from '../lib/shapes';
 
 // Base imagery is isolated here so the provider can be swapped later.
@@ -113,6 +120,7 @@ interface ViewControllerProps {
   guess: LatLng | null;
   target: GameLocation | null;
   targetShape: MultiPolygon | null;
+  targetRadiusKm: number | null;
 }
 
 // Some municipio shapes include distant offshore parts as separate polygon parts —
@@ -122,7 +130,14 @@ interface ViewControllerProps {
 // parts whose nearest vertex is far from the target are excluded from the bounds.
 const FAR_PART_KM = 25;
 
-function ViewController({ roundIndex, revealed, guess, target, targetShape }: ViewControllerProps) {
+function ViewController({
+  roundIndex,
+  revealed,
+  guess,
+  target,
+  targetShape,
+  targetRadiusKm,
+}: ViewControllerProps) {
   const map = useMap();
 
   useEffect(() => {
@@ -142,10 +157,17 @@ function ViewController({ roundIndex, revealed, guess, target, targetShape }: Vi
           if (nearestKm > FAR_PART_KM) continue;
           for (const point of outer) bounds.extend(point as L.LatLngTuple);
         }
+      } else if (targetRadiusKm) {
+        bounds.extend(L.latLng(target.lat, target.lng).toBounds(targetRadiusKm * 2000));
       }
-      map.flyToBounds(bounds.pad(targetShape ? 0.15 : 0.4), { duration: 0.8, maxZoom: 13 });
+      // Point reveals may zoom closer than shape reveals: a near-miss on a
+      // 50 m acceptance circle is invisible at zoom 13.
+      map.flyToBounds(bounds.pad(targetShape ? 0.15 : 0.4), {
+        duration: 0.8,
+        maxZoom: targetShape ? 13 : 15,
+      });
     }
-  }, [revealed, guess, target, targetShape, map]);
+  }, [revealed, guess, target, targetShape, targetRadiusKm, map]);
 
   return null;
 }
@@ -157,6 +179,7 @@ interface MapViewProps {
   guess: LatLng | null;
   target: GameLocation | null;
   targetShape: MultiPolygon | null;
+  targetRadiusKm: number | null;
   inside: boolean;
   onGuess: (guess: LatLng) => void;
 }
@@ -168,17 +191,19 @@ export default function MapView({
   guess,
   target,
   targetShape,
+  targetRadiusKm,
   inside,
   onGuess,
 }: MapViewProps) {
-  // Outside guesses point at the nearest boundary, not the internal point.
+  // Outside guesses point at the nearest boundary (polygon edge or acceptance
+  // circle edge), not the internal point; inside guesses get no line at all.
   const lineEnd: LatLng | null =
-    revealed && guess && target
+    revealed && guess && target && !inside
       ? targetShape
-        ? inside
-          ? null // inside: no line at all
-          : nearestPointOnShape(guess, targetShape).point
-        : { lat: target.lat, lng: target.lng }
+        ? nearestPointOnShape(guess, targetShape).point
+        : targetRadiusKm
+          ? nearestPointOnCircle(guess, target, targetRadiusKm)
+          : { lat: target.lat, lng: target.lng }
       : null;
 
   return (
@@ -203,6 +228,7 @@ export default function MapView({
           guess={guess}
           target={target}
           targetShape={targetShape}
+          targetRadiusKm={targetRadiusKm}
         />
 
         {revealed && targetShape &&
@@ -213,6 +239,14 @@ export default function MapView({
               pathOptions={{ color: '#2dd4a7', weight: 2, fillColor: '#2dd4a7', fillOpacity: 0.15 }}
             />
           ))}
+
+        {revealed && !targetShape && target && targetRadiusKm && (
+          <Circle
+            center={[target.lat, target.lng]}
+            radius={targetRadiusKm * 1000}
+            pathOptions={{ color: '#2dd4a7', weight: 2, fillColor: '#2dd4a7', fillOpacity: 0.15 }}
+          />
+        )}
 
         {revealed && guess && target && (
           <>
