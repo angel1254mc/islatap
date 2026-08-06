@@ -8,3 +8,6 @@ scripts/.tiger-cache/
 
 .vercel
 tsconfig.tsbuildinfo
+
+# Local design notes and plans; not needed by outside contributors
+docs/superpowers/
