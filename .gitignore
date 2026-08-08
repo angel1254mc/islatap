@@ -6,6 +6,10 @@ scripts/.tiger-cache/
 .DS_Store
 *.local
 
+# Local secrets. .env.example is the checked-in template; .env never is.
+.env
+.env*.local
+
 .vercel
 tsconfig.tsbuildinfo
 
