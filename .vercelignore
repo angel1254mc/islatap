@@ -1,5 +1,5 @@
 # Vercel turns every file under api/ into a deployed function. Without this,
-# api/health.test.ts becomes a route that imports `vitest` -- a devDependency
+# api/daily.test.ts becomes a route that imports `vitest` -- a devDependency
 # that is not installed in the production bundle -- and the deploy fails.
 **/*.test.ts
 **/*.test.mjs
