@@ -1,15 +1,6 @@
 import { LOCATIONS, displayName, type Category, type GameLocation } from '../data/locations';
-import {
-  DEFAULT_ACCEPT_RADIUS_KM,
-  MAX_ROUND_POINTS,
-  distanceToCircleKm,
-  distanceToShapeKm,
-  formatDistance,
-  pointInMultiPolygon,
-  scoreForDistance,
-  type LatLng,
-  type MultiPolygon,
-} from './scoring';
+import { MAX_ROUND_POINTS, formatDistance, type LatLng, type MultiPolygon } from './scoring';
+import { evaluateTarget, targetForShapeOrRadius } from './target';
 
 export const ROUNDS_PER_GAME = 5;
 export const MAX_GAME_POINTS = ROUNDS_PER_GAME * MAX_ROUND_POINTS;
@@ -36,38 +27,39 @@ export interface RoundOutcome {
 }
 
 /**
- * Score a guess. With a shape: inside = full marks, outside decays from the
- * nearest boundary. Without one: a circle of `location.radiusKm` (default
- * 50 m) around the point acts as the boundary — inside it is full marks, and
- * decay starts at its edge, so point locations mirror shaped ones.
+ * Score a guess and package it as a RoundOutcome for the UI.
+ *
+ * The scoring rules themselves live in ./target (evaluateTarget), NOT here,
+ * because api/guess.ts has to apply exactly the same rules and cannot import
+ * this file: line 1 pulls LOCATIONS in as a value, which would bundle all
+ * 1088 coordinates into the serverless function, and loadBestScore below
+ * touches window.localStorage. Keeping the geometry rules in a dependency-free
+ * module is what stops the server's score and the client's reveal from drifting
+ * apart.
+ *
+ * What stays here is the shape of RoundOutcome: the location echo and the
+ * (shape, acceptRadiusKm) pair the map needs to draw the reveal.
  */
 export function evaluateGuess(
   location: GameLocation,
   guess: LatLng,
   shape: MultiPolygon | null,
 ): RoundOutcome {
-  if (shape) {
-    const distanceKm = distanceToShapeKm(guess, shape);
-    return {
-      location,
-      guess,
-      distanceKm,
-      points: scoreForDistance(distanceKm),
-      inside: pointInMultiPolygon(guess, shape),
-      shape,
-      acceptRadiusKm: null,
-    };
-  }
-  const acceptRadiusKm = location.radiusKm ?? DEFAULT_ACCEPT_RADIUS_KM;
-  const distanceKm = distanceToCircleKm(guess, location, acceptRadiusKm);
+  const target = targetForShapeOrRadius(shape, location.radiusKm);
+  // GameLocation is structurally a LatLng, so it doubles as the circle center.
+  const verdict = evaluateTarget(guess, location, target);
+
   return {
     location,
     guess,
-    distanceKm,
-    points: scoreForDistance(distanceKm),
-    inside: distanceKm === 0,
-    shape: null,
-    acceptRadiusKm,
+    distanceKm: verdict.distanceKm,
+    points: verdict.points,
+    inside: verdict.inside,
+    shape,
+    // Null for a shaped round: the reveal draws the polygon, not a circle.
+    // Otherwise the radius actually used, including the 50 m default, so the
+    // drawn circle is always the circle that was scored.
+    acceptRadiusKm: target.type === 'CIRCLE' ? target.radiusKm : null,
   };
 }
 
