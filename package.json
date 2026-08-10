@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "db:migrate": "node --env-file=.env scripts/migrate.mjs"
+    "db:migrate": "node --env-file=.env scripts/migrate.mjs",
+    "db:seed": "node --env-file=.env scripts/seed.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
