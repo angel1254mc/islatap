@@ -54,7 +54,16 @@ export function toDailyPayload(gameDate: string, rows: readonly SqlRow[]): Daily
   };
 }
 
-export default async function handler(request: Request): Promise<Response> {
+/**
+ * Exported as `GET`, not as a default.
+ *
+ * Vercel's Node runtime reads `export default` as the legacy
+ * `(req, res) => void` signature and throws away anything it returns, so a
+ * default-exported web handler never writes a response and the invocation
+ * hangs until maxDuration. Named method exports get the `Request` -> `Response`
+ * treatment this handler is written for.
+ */
+export async function GET(request: Request): Promise<Response> {
   if (request.method !== 'GET') {
     return jsonResponse({ error: 'method-not-allowed' }, 405, { allow: 'GET' });
   }

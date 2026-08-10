@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SqlExecutor, SqlRow } from './_lib/db.js';
 import { setSqlForTest } from './_lib/db.js';
-import handler, { DAILY_ROUNDS_SQL, toDailyPayload } from './daily.js';
+import { GET as handler, DAILY_ROUNDS_SQL, toDailyPayload } from './daily.js';
 
 /**
  * Rows shaped as the driver would hand them back — plus the columns the query

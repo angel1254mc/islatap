@@ -122,7 +122,16 @@ export function scoreGuess(answer: AnswerRow, guess: LatLng): GuessResponse {
  * player's history lives in their own localStorage, and there is nothing here
  * worth cheating past that is not already revealed by the response itself.
  */
-export default async function handler(request: Request): Promise<Response> {
+/**
+ * Exported as `POST`, not as a default. See the note on api/daily.ts's `GET`:
+ * Vercel's Node runtime treats a default export as `(req, res) => void` and
+ * discards the returned Response.
+ *
+ * The method check below is kept even though Vercel now routes by method, so
+ * the 405 contract still holds for any caller that reaches the handler
+ * directly.
+ */
+export async function POST(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
     return jsonResponse({ error: 'method-not-allowed' }, 405, { allow: 'POST' });
   }

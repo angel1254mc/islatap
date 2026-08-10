@@ -3,7 +3,7 @@ import type { SqlExecutor } from '../_lib/db.js';
 import { setSqlForTest } from '../_lib/db.js';
 import { addDays, todayInAst } from '../_lib/date.js';
 import { EXISTING_PUZZLE_DATES_SQL } from '../_lib/puzzle.js';
-import handler, { BUFFER_DAYS, isAuthorized } from './top-up.js';
+import { GET as handler, BUFFER_DAYS, isAuthorized } from './top-up.js';
 
 const SECRET = 'test-cron-secret';
 

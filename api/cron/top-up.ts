@@ -33,7 +33,12 @@ export function isAuthorized(header: string | null, secret: string): boolean {
   return timingSafeEqual(provided, expected);
 }
 
-export default async function handler(request: Request): Promise<Response> {
+/**
+ * Exported as `GET`, not as a default. See the note on api/daily.ts's `GET`:
+ * Vercel's Node runtime treats a default export as `(req, res) => void` and
+ * discards the returned Response. Vercel Cron issues a GET.
+ */
+export async function GET(request: Request): Promise<Response> {
   // process.env.CRON_SECRET is string | undefined; collapsing the unset case to
   // '' right here keeps isAuthorized's contract a plain string, and '' is the
   // value it treats as "no secret configured" and refuses unconditionally.

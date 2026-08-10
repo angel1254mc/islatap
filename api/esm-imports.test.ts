@@ -61,6 +61,26 @@ describe('api/ is resolvable by Node under ESM', () => {
     }
   });
 
+  it('exports named HTTP methods, never a default, from every endpoint', () => {
+    // Vercel's Node runtime reads `export default` as the legacy
+    // `(req, res) => void` signature and ignores whatever it returns. A
+    // default-exported `Request` -> `Response` handler therefore never writes
+    // a response: the invocation hangs until maxDuration and the caller gets a
+    // 60s timeout. This also passed every local test, because the tests call
+    // the handler function directly and never go through Vercel's dispatcher.
+    const endpoints = ['daily.ts', 'guess.ts', join('cron', 'top-up.ts')];
+
+    for (const endpoint of endpoints) {
+      const source = readFileSync(join(API_DIR, endpoint), 'utf8');
+      expect(source, `${endpoint} must not use a default export`).not.toMatch(
+        /^export\s+default\b/m,
+      );
+      expect(source, `${endpoint} must export a named HTTP method`).toMatch(
+        /^export\s+(async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE)\b/m,
+      );
+    }
+  });
+
   it('catches an extensionless specifier if one is reintroduced', () => {
     // Guards the guard: proves the matcher is not vacuously passing.
     expect(relativeSpecifiers("import { x } from './_lib/date';")).toEqual(['./_lib/date']);
