@@ -234,3 +234,65 @@ describe('helpers', () => {
     });
   });
 });
+
+describe('practice mode', () => {
+  const PROMPTS = [
+    { key: 'practice-1', name: 'Adjuntas', municipio: null, category: 'municipio' as const, subtype: 'municipio' as const },
+    { key: 'practice-2', name: 'Capáez', municipio: 'Adjuntas', category: 'barrio' as const, subtype: 'barrio' as const },
+  ];
+
+  const OUTCOME = {
+    key: 'practice-1',
+    name: 'Adjuntas',
+    municipio: null,
+    subtype: 'municipio' as const,
+    guess: TAP,
+    answer: { lat: 18.16274, lng: -66.72212, name: 'Adjuntas', municipio: null },
+    distanceKm: 3.2,
+    points: 3630,
+    inside: false,
+    shape: null,
+    acceptRadiusKm: 0.05,
+  };
+
+  const READY = () =>
+    run({ type: 'practice/load-start' }, { type: 'practice/ready', prompts: PROMPTS });
+
+  it('loads through the same loading phase as the daily puzzle', () => {
+    const loading = run({ type: 'practice/load-start' });
+    expect(loading.phase).toBe('loading');
+    expect(loading.mode).toBe('practice');
+    // No gameDate: practice is not tied to a calendar day and must never be
+    // written into the daily history.
+    expect(loading.gameDate).toBeNull();
+
+    const ready = READY();
+    expect(ready.phase).toBe('playing');
+    expect(ready.prompts).toHaveLength(2);
+  });
+
+  it('accepts a locally-scored outcome through the same guard rails', () => {
+    const state = run(
+      { type: 'practice/load-start' },
+      { type: 'practice/ready', prompts: PROMPTS },
+      { type: 'guess/start', guess: TAP },
+      { type: 'guess/resolved', key: 'practice-1', outcome: OUTCOME },
+    );
+    expect(state.phase).toBe('revealed');
+    expect(state.outcomes).toEqual([OUTCOME]);
+  });
+
+  it('drops a locally-scored outcome for the wrong round', () => {
+    const submitting = gameReducer(READY(), { type: 'guess/start', guess: TAP });
+    expect(
+      gameReducer(submitting, { type: 'guess/resolved', key: 'practice-2', outcome: OUTCOME }),
+    ).toBe(submitting);
+  });
+
+  it('rejects a second tap while a practice guess is resolving', () => {
+    const submitting = gameReducer(READY(), { type: 'guess/start', guess: TAP });
+    expect(gameReducer(submitting, { type: 'guess/start', guess: { lat: 18.3, lng: -66.1 } })).toBe(
+      submitting,
+    );
+  });
+});

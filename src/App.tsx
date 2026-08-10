@@ -8,14 +8,20 @@ import StartScreen from './components/StartScreen';
 import StatusScreen from './components/StatusScreen';
 import { fetchDaily, submitGuess, userMessage } from './lib/api';
 import { loadBestScore, saveBestScore } from './lib/game';
+import { loadPracticeGame, scorePracticeGuess } from './lib/practice';
 import { INITIAL_GAME_STATE, gameReducer, totalScoreOf } from './lib/round-state';
 import { MAX_ROUND_POINTS, type LatLng } from './lib/scoring';
 import { startShapeLoad } from './lib/shapes';
+import type { GameLocation } from './data/types';
 
 export default function App() {
   const [state, dispatch] = useReducer(gameReducer, INITIAL_GAME_STATE);
   const [bestScore, setBestScore] = useState<number | null>(() => loadBestScore());
   const [isNewBest, setIsNewBest] = useState(false);
+  // Parallel to state.prompts: practice scores locally, so it needs the full
+  // location (coordinates and all) that each prompt was made from. Daily
+  // never populates this — its answers only exist on the server.
+  const [practiceLocations, setPracticeLocations] = useState<GameLocation[]>([]);
 
   // Boundary shapes still load at mount here; a later task moves this off the
   // critical path now that the daily reveal gets its geometry from the guess
@@ -37,7 +43,7 @@ export default function App() {
   // and what keeps React 19 StrictMode's double-invoked mount effect to one
   // network request in development.
   useEffect(() => {
-    if (state.phase !== 'loading') return;
+    if (state.mode !== 'daily' || state.phase !== 'loading') return;
     let live = true;
     void fetchDaily()
       .then((puzzle) => {
@@ -49,7 +55,30 @@ export default function App() {
     return () => {
       live = false;
     };
-  }, [state.phase]);
+  }, [state.mode, state.phase]);
+
+  // ---- build a practice game ------------------------------------------
+  useEffect(() => {
+    if (state.mode !== 'practice' || state.phase !== 'loading') return;
+    let live = true;
+    void loadPracticeGame()
+      .then((game) => {
+        if (!live) return;
+        setPracticeLocations(game.locations);
+        dispatch({ type: 'practice/ready', prompts: game.prompts });
+      })
+      .catch((error: unknown) => {
+        if (live) {
+          dispatch({
+            type: 'daily/load-fail',
+            message: `Could not start practice mode: ${String(error)}`,
+          });
+        }
+      });
+    return () => {
+      live = false;
+    };
+  }, [state.mode, state.phase]);
 
   // ---- submit the pending guess ---------------------------------------
   // Driven by state rather than called straight from the click handler: the
@@ -62,31 +91,46 @@ export default function App() {
     const guess = state.pendingGuess;
     if (!key || !guess) return;
     let live = true;
-    void submitGuess(key, guess)
-      .then((result) => {
-        if (live) dispatch({ type: 'guess/ok', key, result });
-      })
-      .catch((error: unknown) => {
-        if (live) dispatch({ type: 'guess/fail', key, message: userMessage(error) });
-      });
+
+    const resolve =
+      state.mode === 'daily'
+        ? submitGuess(key, guess).then((result) => {
+            if (live) dispatch({ type: 'guess/ok', key, result });
+          })
+        : (async () => {
+            const location = practiceLocations[state.roundIndex];
+            if (!location) throw new Error('practice round has no location');
+            const outcome = await scorePracticeGuess(location, guess);
+            if (live) dispatch({ type: 'guess/resolved', key, outcome });
+          })();
+
+    void resolve.catch((error: unknown) => {
+      if (live) dispatch({ type: 'guess/fail', key, message: userMessage(error) });
+    });
+
     return () => {
       live = false;
     };
-  }, [state.phase, state.pendingKey, state.pendingGuess]);
+  }, [state.phase, state.mode, state.roundIndex, state.pendingKey, state.pendingGuess, practiceLocations]);
 
   // ---- best score -------------------------------------------------------
   useEffect(() => {
-    if (state.phase !== 'results') return;
+    if (state.phase !== 'results' || state.mode !== 'daily') return;
     if (bestScore === null || totalScore > bestScore) {
       setBestScore(totalScore);
       setIsNewBest(true);
       saveBestScore(totalScore);
     }
-  }, [state.phase, totalScore, bestScore]);
+  }, [state.phase, state.mode, totalScore, bestScore]);
 
   const startDaily = useCallback(() => {
     setIsNewBest(false);
     dispatch({ type: 'daily/load-start' });
+  }, []);
+
+  const startPractice = useCallback(() => {
+    setIsNewBest(false);
+    dispatch({ type: 'practice/load-start' });
   }, []);
 
   const handleGuess = useCallback((guess: LatLng) => {
@@ -144,13 +188,17 @@ export default function App() {
         />
       )}
 
-      {state.phase === 'start' && <StartScreen bestScore={bestScore} onPlay={startDaily} />}
+      {state.phase === 'start' && (
+        <StartScreen bestScore={bestScore} onPlayDaily={startDaily} onPlayPractice={startPractice} />
+      )}
 
       {state.phase === 'loading' && (
         <StatusScreen
           kicker="🇵🇷 Puerto Rico Edition"
           title="Cargando…"
-          message="Fetching today’s five places."
+          message={
+            state.mode === 'daily' ? 'Fetching today’s five places.' : 'Shuffling five random places.'
+          }
         />
       )}
 
@@ -158,9 +206,9 @@ export default function App() {
         <StatusScreen
           kicker="🇵🇷 Puerto Rico Edition"
           title="Ay, bendito"
-          message={state.errorMessage ?? 'Could not load today’s puzzle.'}
+          message={state.errorMessage ?? 'Could not start the game.'}
           actionLabel="Try again"
-          onAction={startDaily}
+          onAction={state.mode === 'daily' ? startDaily : startPractice}
         />
       )}
 
@@ -171,7 +219,8 @@ export default function App() {
           maxScore={maxScore}
           bestScore={bestScore}
           isNewBest={isNewBest}
-          onPlayAgain={startDaily}
+          // One daily puzzle per day: replaying it is not on offer.
+          onPlayAgain={state.mode === 'practice' ? startPractice : null}
         />
       )}
     </div>

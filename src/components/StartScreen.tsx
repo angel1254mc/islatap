@@ -1,9 +1,10 @@
 interface StartScreenProps {
   bestScore: number | null;
-  onPlay: () => void;
+  onPlayDaily: () => void;
+  onPlayPractice: () => void;
 }
 
-export default function StartScreen({ bestScore, onPlay }: StartScreenProps) {
+export default function StartScreen({ bestScore, onPlayDaily, onPlayPractice }: StartScreenProps) {
   return (
     <div className="screen">
       <div className="screen__card">
@@ -17,16 +18,19 @@ export default function StartScreen({ bestScore, onPlay }: StartScreenProps) {
         <ul className="screen__rules">
           <li>📍 Read the prompt, then tap the satellite map as close as you can.</li>
           <li>📏 The closer your tap, the more you earn — up to 5,000 points a round.</li>
-          <li>🏆 25,000 is a perfect game. ¿Te atreves?</li>
+          <li>🗓️ Everyone gets the same five places each day. Practice is unlimited.</li>
         </ul>
         {bestScore !== null && (
           <div className="best-chip">
             Best score <strong>{bestScore.toLocaleString('en-US')}</strong>
           </div>
         )}
-        <div>
-          <button type="button" className="btn btn--primary btn--big" onClick={onPlay}>
-            Play
+        <div className="start__actions">
+          <button type="button" className="btn btn--primary btn--big" onClick={onPlayDaily}>
+            Today’s puzzle
+          </button>
+          <button type="button" className="btn btn--ghost" onClick={onPlayPractice}>
+            Practice
           </button>
         </div>
       </div>

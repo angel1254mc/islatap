@@ -583,3 +583,12 @@ th.results__points-col {
   font-size: 14px;
   color: var(--ink-dim);
 }
+
+/* Daily is the headline action; practice is the escape hatch, so they stack
+   rather than sit side by side and compete for the same weight. */
+.start__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}

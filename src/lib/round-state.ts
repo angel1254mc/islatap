@@ -84,8 +84,11 @@ export type GameAction =
   | { type: 'daily/load-start' }
   | { type: 'daily/load-ok'; puzzle: DailyPuzzle }
   | { type: 'daily/load-fail'; message: string }
+  | { type: 'practice/load-start' }
+  | { type: 'practice/ready'; prompts: PromptView[] }
   | { type: 'guess/start'; guess: LatLng }
   | { type: 'guess/ok'; key: string; result: GuessResult }
+  | { type: 'guess/resolved'; key: string; outcome: PlayedRound }
   | { type: 'guess/fail'; key: string; message: string }
   | { type: 'guess/retry' }
   | { type: 'round/next' };
@@ -168,6 +171,27 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (state.phase !== 'loading') return state;
       return { ...state, phase: 'load-error', errorMessage: action.message };
 
+    case 'practice/load-start':
+      // Practice shares the loading phase even though nothing is fetched from a
+      // server: the location table is code-split out of the main bundle, so
+      // there is a real (if short) await before the first prompt exists.
+      return { ...INITIAL_GAME_STATE, mode: 'practice', phase: 'loading' };
+
+    case 'practice/ready':
+      if (state.phase !== 'loading') return state;
+      return {
+        ...state,
+        phase: 'playing',
+        // Deliberately no gameDate: practice is unscored and untimed, and a
+        // date here would let a practice run be written into the daily history
+        // and inflate a streak.
+        gameDate: null,
+        prompts: action.prompts,
+        roundIndex: 0,
+        outcomes: [],
+        errorMessage: null,
+      };
+
     case 'guess/start': {
       // Only a live round accepts a tap. Rejecting from 'submitting' is the
       // double-tap guard: the map's click handler fires on every click while
@@ -200,6 +224,23 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         phase: 'revealed',
         outcomes: [...state.outcomes, playedRound(prompt, guess, action.result)],
+        pendingGuess: null,
+        pendingKey: null,
+        errorMessage: null,
+      };
+    }
+
+    case 'guess/resolved': {
+      // Practice scores locally, so it hands the reducer a finished round
+      // instead of a server response — but it goes through the same phase and
+      // stale-key checks, so the double-tap and wrong-round guards apply
+      // identically in both modes.
+      if (state.phase !== 'submitting') return state;
+      if (action.key !== state.pendingKey) return state;
+      return {
+        ...state,
+        phase: 'revealed',
+        outcomes: [...state.outcomes, action.outcome],
         pendingGuess: null,
         pendingKey: null,
         errorMessage: null,
