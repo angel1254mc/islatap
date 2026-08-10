@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { MultiPolygon } from '../src/lib/scoring';
-import type { SqlExecutor, SqlRow } from './_lib/db';
-import { setSqlForTest } from './_lib/db';
-import handler, { GUESS_ROUND_SQL, parseAnswerRow, scoreGuess } from './guess';
+import type { MultiPolygon } from '../src/lib/scoring.js';
+import type { SqlExecutor, SqlRow } from './_lib/db.js';
+import { setSqlForTest } from './_lib/db.js';
+import handler, { GUESS_ROUND_SQL, parseAnswerRow, scoreGuess } from './guess.js';
 
 const ROUND_ID = '11111111-1111-4111-8111-111111111111';
 

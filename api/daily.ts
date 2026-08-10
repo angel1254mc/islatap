@@ -1,8 +1,8 @@
-import type { Category, Difficulty, Subtype } from '../src/data/types';
-import type { DailyPayload } from '../src/lib/api-types';
-import { todayInAst } from './_lib/date';
-import { getSql, type SqlRow } from './_lib/db';
-import { jsonResponse } from './_lib/http';
+import type { Category, Difficulty, Subtype } from '../src/data/types.js';
+import type { DailyPayload } from '../src/lib/api-types.js';
+import { todayInAst } from './_lib/date.js';
+import { getSql, type SqlRow } from './_lib/db.js';
+import { jsonResponse } from './_lib/http.js';
 
 export const config = { runtime: 'nodejs' };
 

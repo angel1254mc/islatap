@@ -6,7 +6,7 @@ import {
   scoreForDistance,
   type LatLng,
   type MultiPolygon,
-} from './scoring';
+} from './scoring.js';
 
 /**
  * What a round is scored against.

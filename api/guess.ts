@@ -1,10 +1,10 @@
-import type { GuessResponse } from '../src/lib/api-types';
-import type { LatLng, MultiPolygon } from '../src/lib/scoring';
-import { evaluateTarget, targetForShapeOrRadius } from '../src/lib/target';
-import { todayInAst } from './_lib/date';
-import { getSql, type SqlRow } from './_lib/db';
-import { jsonResponse } from './_lib/http';
-import { guessBodySchema } from './_lib/validation';
+import type { GuessResponse } from '../src/lib/api-types.js';
+import type { LatLng, MultiPolygon } from '../src/lib/scoring.js';
+import { evaluateTarget, targetForShapeOrRadius } from '../src/lib/target.js';
+import { todayInAst } from './_lib/date.js';
+import { getSql, type SqlRow } from './_lib/db.js';
+import { jsonResponse } from './_lib/http.js';
+import { guessBodySchema } from './_lib/validation.js';
 
 export const config = { runtime: 'nodejs' };
 

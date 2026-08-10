@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Category } from '../../src/data/types';
-import { addDays } from './date';
+import type { Category } from '../../src/data/types.js';
+import { addDays } from './date.js';
 import {
   BAG_CANDIDATES_SQL,
   ROUNDS_PER_DAY,
@@ -9,7 +9,7 @@ import {
   isLandmarkDay,
   type BagCandidate,
   type DrawnRound,
-} from './puzzle';
+} from './puzzle.js';
 
 interface PoolEntry {
   id: number;

@@ -1,5 +1,5 @@
-import type { Category } from '../../src/data/types';
-import { epochDay } from './date';
+import type { Category } from '../../src/data/types.js';
+import { epochDay } from './date.js';
 
 /**
  * Rounds in one daily puzzle.

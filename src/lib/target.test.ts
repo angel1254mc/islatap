@@ -132,7 +132,11 @@ const importsOf = (file: string): string[] => {
 
 describe('target.ts stays importable from api/', () => {
   it('depends only on ./scoring, which depends on nothing', () => {
-    expect(importsOf('target.ts')).toEqual(['./scoring']);
+    // The `.js` suffix is deliberate and load-bearing: api/guess.ts imports
+    // this module, Vercel compiles api/ to ESM, and Node's ESM resolver will
+    // not guess an extension. Dropping it deploys a function that crashes on
+    // its first invocation while every local check stays green.
+    expect(importsOf('target.ts')).toEqual(['./scoring.js']);
     expect(importsOf('scoring.ts')).toEqual([]);
   });
 

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { Category } from '../../src/data/types';
-import { addDays } from './date';
-import type { SqlExecutor, SqlRow } from './db';
-import { generateDate, topUpBuffer } from './generate';
+import type { Category } from '../../src/data/types.js';
+import { addDays } from './date.js';
+import type { SqlExecutor, SqlRow } from './db.js';
+import { generateDate, topUpBuffer } from './generate.js';
 import {
   BAG_CANDIDATES_SQL,
   CLAIM_AND_INSERT_ROUNDS_SQL,
   EXISTING_PUZZLE_DATES_SQL,
-} from './puzzle';
+} from './puzzle.js';
 
 interface PoolEntry {
   id: number;

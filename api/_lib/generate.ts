@@ -1,13 +1,13 @@
-import type { Category } from '../../src/data/types';
-import { addDays } from './date';
-import type { SqlExecutor } from './db';
+import type { Category } from '../../src/data/types.js';
+import { addDays } from './date.js';
+import type { SqlExecutor } from './db.js';
 import {
   BAG_CANDIDATES_SQL,
   CLAIM_AND_INSERT_ROUNDS_SQL,
   EXISTING_PUZZLE_DATES_SQL,
   drawRounds,
   type BagCandidate,
-} from './puzzle';
+} from './puzzle.js';
 
 export interface TopUpResult {
   /** Dates this run created a puzzle for. */

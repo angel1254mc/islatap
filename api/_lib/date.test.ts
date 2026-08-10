@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, epochDay, fromEpochDay, todayInAst } from './date';
+import { addDays, epochDay, fromEpochDay, todayInAst } from './date.js';
 
 describe('epochDay', () => {
   it('counts days from the unix epoch', () => {

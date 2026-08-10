@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { SqlExecutor } from '../_lib/db';
-import { setSqlForTest } from '../_lib/db';
-import { addDays, todayInAst } from '../_lib/date';
-import { EXISTING_PUZZLE_DATES_SQL } from '../_lib/puzzle';
-import handler, { BUFFER_DAYS, isAuthorized } from './top-up';
+import type { SqlExecutor } from '../_lib/db.js';
+import { setSqlForTest } from '../_lib/db.js';
+import { addDays, todayInAst } from '../_lib/date.js';
+import { EXISTING_PUZZLE_DATES_SQL } from '../_lib/puzzle.js';
+import handler, { BUFFER_DAYS, isAuthorized } from './top-up.js';
 
 const SECRET = 'test-cron-secret';
 

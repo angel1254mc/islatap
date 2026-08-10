@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PR_BOUNDS, guessBodySchema } from './validation';
+import { PR_BOUNDS, guessBodySchema } from './validation.js';
 
 const ROUND_ID = '11111111-1111-4111-8111-111111111111';
 const SAN_JUAN = { roundId: ROUND_ID, lat: 18.46633, lng: -66.10572 };

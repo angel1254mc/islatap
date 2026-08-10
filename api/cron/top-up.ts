@@ -1,8 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
-import { todayInAst } from '../_lib/date';
-import { getSql } from '../_lib/db';
-import { topUpBuffer } from '../_lib/generate';
-import { jsonResponse } from '../_lib/http';
+import { todayInAst } from '../_lib/date.js';
+import { getSql } from '../_lib/db.js';
+import { topUpBuffer } from '../_lib/generate.js';
+import { jsonResponse } from '../_lib/http.js';
 
 /** Node, not Edge: node:crypto and the Neon HTTP driver both want it. */
 export const config = { runtime: 'nodejs' };
