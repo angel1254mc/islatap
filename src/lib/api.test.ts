@@ -138,6 +138,43 @@ describe('fetchDaily', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ gameDate: '2026-08-05', rounds: [] })));
     await expect(fetchDaily()).rejects.toMatchObject({ kind: 'malformed' });
   });
+
+  it('tags a daily failure with the daily request context', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({}) }));
+    await expect(fetchDaily()).rejects.toMatchObject({ kind: 'http', status: 404, context: 'daily' });
+  });
+
+  it('refetches once the AST calendar date has moved past the cached gameDate', async () => {
+    // A tab left open across midnight AST (e.g. sitting on the results screen
+    // after finishing at 11:58 pm) must not hand "Play again" the same puzzle
+    // it served hours earlier just because the in-flight-request memo never
+    // expires on its own.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-08-09T20:00:00Z')); // 4:00 pm AST, Aug 9
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(okResponse({ ...DAILY_OK, gameDate: '2026-08-09' }))
+        .mockResolvedValueOnce(okResponse({ ...DAILY_OK, gameDate: '2026-08-10' }));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const first = await fetchDaily();
+      expect(first.gameDate).toBe('2026-08-09');
+
+      // Still Aug 9 in AST — the memo should serve the same puzzle, not refetch.
+      const second = await fetchDaily();
+      expect(second.gameDate).toBe('2026-08-09');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // 2026-08-10T04:00:00Z is exactly midnight AST on Aug 10 — the boundary.
+      vi.setSystemTime(new Date('2026-08-10T05:00:00Z'));
+      const third = await fetchDaily();
+      expect(third.gameDate).toBe('2026-08-10');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('parseDailyPuzzle', () => {
@@ -232,6 +269,18 @@ describe('submitGuess', () => {
       parseGuessResult({ ...GUESS_CIRCLE_OK, target: { type: 'CIRCLE', radiusKm: 0 } }),
     ).toThrow(ApiError);
   });
+
+  it('tags an unknown-round 404 with the guess request context', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: 'unknown-round' }) }),
+    );
+    await expect(submitGuess('stale-round', { lat: 18.2, lng: -66.7 })).rejects.toMatchObject({
+      kind: 'http',
+      status: 404,
+      context: 'guess',
+    });
+  });
 });
 
 describe('userMessage', () => {
@@ -248,5 +297,16 @@ describe('userMessage', () => {
 
   it('has dedicated copy for a puzzle that is not published yet', () => {
     expect(userMessage(new ApiError('http', 'HTTP 404', 404))).toMatch(/not ready/i);
+  });
+
+  it('gives a guess 404 its own copy instead of reusing the daily "not ready" message', () => {
+    // /api/daily's 404 means today's puzzle doesn't exist yet; /api/guess's
+    // 404 means the roundId is gone (api/guess.ts's 'unknown-round') — a
+    // stale tab, not an unpublished day. Same status code, different failure.
+    const dailyMessage = userMessage(new ApiError('http', 'HTTP 404', 404, 'daily'));
+    const guessMessage = userMessage(new ApiError('http', 'HTTP 404', 404, 'guess'));
+    expect(guessMessage).not.toBe(dailyMessage);
+    expect(guessMessage).not.toMatch(/not ready/i);
+    expect(dailyMessage).toMatch(/not ready/i);
   });
 });

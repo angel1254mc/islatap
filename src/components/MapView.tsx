@@ -13,7 +13,6 @@ import {
   useMapEvents,
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { GameLocation } from '../data/locations';
 import {
   haversineKm,
   nearestPointOnCircle,
@@ -22,6 +21,18 @@ import {
   type LatLng,
 } from '../lib/scoring';
 import { getShapesByLayer, startShapeLoad, type ShapeLayer } from '../lib/shapes';
+
+/**
+ * Everything the reveal needs to know about the answer. Deliberately not
+ * GameLocation: the daily mode learns the answer from a guess response, which
+ * carries exactly these fields, and importing GameLocation here would drag the
+ * whole bundled location table into the map's import graph.
+ */
+export interface TargetView {
+  lat: number;
+  lng: number;
+  name: string;
+}
 
 // Base imagery is isolated here so the provider can be swapped later.
 const BASE_LAYER_URL =
@@ -118,7 +129,7 @@ interface ViewControllerProps {
   roundIndex: number;
   revealed: boolean;
   guess: LatLng | null;
-  target: GameLocation | null;
+  target: TargetView | null;
   targetShape: MultiPolygon | null;
   targetRadiusKm: number | null;
 }
@@ -177,7 +188,7 @@ interface MapViewProps {
   interactive: boolean;
   revealed: boolean;
   guess: LatLng | null;
-  target: GameLocation | null;
+  target: TargetView | null;
   targetShape: MultiPolygon | null;
   targetRadiusKm: number | null;
   inside: boolean;

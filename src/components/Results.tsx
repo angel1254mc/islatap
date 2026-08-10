@@ -1,19 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
-import { MAX_GAME_POINTS, buildShareText, type RoundOutcome } from '../lib/game';
+import type { ResultRow } from '../lib/round-state';
+import { buildShareText } from '../lib/share';
 import { formatDistance } from '../lib/scoring';
-import { displayName } from '../data/locations';
+// From data/types, NOT data/locations. Results.tsx is statically imported by
+// App.tsx, and data/locations re-exports displayName alongside the 216 KB
+// LOCATIONS array — Rollup keeps a module that the entry imports statically in
+// the entry chunk even when a lazy chunk also imports it dynamically, so one
+// character of import path here is the difference between a code split that
+// works and one that silently does not. data/types has no LOCATIONS.
+import { displayName } from '../data/types';
 
 interface ResultsProps {
-  outcomes: RoundOutcome[];
+  rows: ResultRow[];
   totalScore: number;
+  /** Perfect score for THIS puzzle — the server owns the round count now. */
+  maxScore: number;
   bestScore: number | null;
   isNewBest: boolean;
-  onPlayAgain: () => void;
+  /** Null when replaying is not offered (the daily puzzle is once a day). */
+  onPlayAgain: (() => void) | null;
 }
 
 export default function Results({
-  outcomes,
+  rows,
   totalScore,
+  maxScore,
   bestScore,
   isNewBest,
   onPlayAgain,
@@ -26,7 +37,7 @@ export default function Results({
   }, []);
 
   const copyResult = async () => {
-    const text = buildShareText(outcomes, totalScore);
+    const text = buildShareText(rows, { total: totalScore, maxTotal: maxScore });
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -48,7 +59,7 @@ export default function Results({
         <p className="screen__kicker">Final score</p>
         <h1 className="results__total">
           {totalScore.toLocaleString('en-US')}
-          <small> / {MAX_GAME_POINTS.toLocaleString('en-US')}</small>
+          <small> / {maxScore.toLocaleString('en-US')}</small>
         </h1>
         {isNewBest ? (
           <p className="results__best results__best--new">🏆 ¡Nuevo récord! New best score.</p>
@@ -69,17 +80,15 @@ export default function Results({
               </tr>
             </thead>
             <tbody>
-              {outcomes.map((outcome, index) => (
-                <tr key={outcome.location.id}>
+              {rows.map((row, index) => (
+                <tr key={row.key}>
                   <td>{index + 1}</td>
                   <td className="results__place">
-                    {displayName(outcome.location)}
-                    <small>{outcome.location.subtype}</small>
+                    {displayName(row)}
+                    {row.subtype && <small>{row.subtype}</small>}
                   </td>
-                  <td>{outcome.inside ? '¡Adentro!' : formatDistance(outcome.distanceKm)}</td>
-                  <td className="results__points-col">
-                    {outcome.points.toLocaleString('en-US')}
-                  </td>
+                  <td>{row.inside ? '¡Adentro!' : formatDistance(row.distanceKm)}</td>
+                  <td className="results__points-col">{row.points.toLocaleString('en-US')}</td>
                 </tr>
               ))}
             </tbody>
@@ -90,9 +99,11 @@ export default function Results({
           <button type="button" className="btn btn--ghost" onClick={() => void copyResult()}>
             {copied ? 'Copied ✓' : 'Copy result'}
           </button>
-          <button type="button" className="btn btn--primary" onClick={onPlayAgain}>
-            Play again
-          </button>
+          {onPlayAgain && (
+            <button type="button" className="btn btn--primary" onClick={onPlayAgain}>
+              Play again
+            </button>
+          )}
         </div>
       </div>
     </div>

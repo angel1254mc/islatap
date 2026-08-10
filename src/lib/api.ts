@@ -43,6 +43,17 @@ export const REQUEST_TIMEOUT_MS = 10_000;
 export type ApiErrorKind = 'network' | 'timeout' | 'http' | 'malformed';
 
 /**
+ * Which endpoint a failed request was for. Carried on the error purely so
+ * userMessage() can give the same HTTP status different copy depending on
+ * what failed: a 404 from /api/daily means today's puzzle has not been
+ * published yet, but a 404 from /api/guess means the roundId itself is
+ * unknown (api/guess.ts's 'unknown-round') — a stale tab, not an unready day.
+ * Null for errors raised while parsing a response body, since a malformed
+ * payload does not need the distinction.
+ */
+export type ApiRequestContext = 'daily' | 'guess';
+
+/**
  * One error type for every failure mode so callers can branch on `kind`
  * instead of sniffing message strings. `status` is only meaningful for
  * kind === 'http'.
@@ -50,12 +61,19 @@ export type ApiErrorKind = 'network' | 'timeout' | 'http' | 'malformed';
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status: number | null;
+  readonly context: ApiRequestContext | null;
 
-  constructor(kind: ApiErrorKind, message: string, status: number | null = null) {
+  constructor(
+    kind: ApiErrorKind,
+    message: string,
+    status: number | null = null,
+    context: ApiRequestContext | null = null,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.kind = kind;
     this.status = status;
+    this.context = context;
   }
 }
 
@@ -68,9 +86,15 @@ export function userMessage(error: unknown): string {
       case 'network':
         return 'No connection to the server. Check your network and try again.';
       case 'http':
-        return error.status === 404
-          ? 'Today’s puzzle is not ready yet. Try again in a moment.'
-          : `The server hit an error (${error.status ?? '?'}). Try again.`;
+        if (error.status === 404) {
+          // /api/guess 404s when a roundId no longer exists — a different
+          // failure from /api/daily simply not having today's puzzle yet, so
+          // it gets its own copy instead of reusing "not ready yet".
+          return error.context === 'guess'
+            ? 'That round is no longer available. Reload to get today’s puzzle.'
+            : 'Today’s puzzle is not ready yet. Try again in a moment.';
+        }
+        return `The server hit an error (${error.status ?? '?'}). Try again.`;
       case 'malformed':
         return 'The server sent something unexpected. Try again.';
     }
@@ -219,7 +243,7 @@ export function parseGuessResult(value: unknown): GuessResult {
 
 // ------------------------------ transport -----------------------------
 
-async function requestJson(url: string, init: RequestInit): Promise<unknown> {
+async function requestJson(url: string, init: RequestInit, context: ApiRequestContext): Promise<unknown> {
   const controller = new AbortController();
   // ReturnType<typeof setTimeout> rather than `number`: the same source is
   // typechecked with the DOM lib today and may be typechecked with Node's
@@ -233,20 +257,38 @@ async function requestJson(url: string, init: RequestInit): Promise<unknown> {
     // fetch rejects for both a dead network and our own abort; only the
     // signal can tell them apart, and they need different copy.
     throw controller.signal.aborted
-      ? new ApiError('timeout', `${url} timed out after ${REQUEST_TIMEOUT_MS} ms`)
-      : new ApiError('network', `${url} could not be reached: ${String(cause)}`);
+      ? new ApiError('timeout', `${url} timed out after ${REQUEST_TIMEOUT_MS} ms`, null, context)
+      : new ApiError('network', `${url} could not be reached: ${String(cause)}`, null, context);
   } finally {
     clearTimeout(timer);
   }
 
   if (!response.ok) {
-    throw new ApiError('http', `${url} returned HTTP ${response.status}`, response.status);
+    throw new ApiError('http', `${url} returned HTTP ${response.status}`, response.status, context);
   }
   try {
     return await response.json();
   } catch {
-    throw new ApiError('malformed', `${url} did not return JSON`);
+    throw new ApiError('malformed', `${url} did not return JSON`, null, context);
   }
+}
+
+/**
+ * Puerto Rico: Atlantic Standard Time, UTC-4, no DST anywhere in the year —
+ * matching api/_lib/date.ts, which is the server's source of truth for
+ * gameDate. This client-side copy exists only to decide whether a *cached*
+ * puzzle might be stale; the server, not this function, decides what today's
+ * actual gameDate is.
+ */
+const GAME_TIME_ZONE = 'America/Puerto_Rico';
+
+function todayInAst(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: GAME_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 }
 
 /**
@@ -259,14 +301,38 @@ async function requestJson(url: string, init: RequestInit): Promise<unknown> {
  *
  * The memo is cleared on failure — otherwise a retry after a dropped
  * connection would keep re-awaiting the same rejected promise forever.
+ *
+ * It is also cleared across an AST calendar-day boundary. `dailyPromiseAstDate`
+ * records todayInAst() at the moment the request was issued (deliberately NOT
+ * the resolved puzzle's own `gameDate` — that would tie cache validity to
+ * what a mock or a clock-skewed server claims rather than to this client's own
+ * clock), and a later call noticing the date has moved on drops the memo
+ * before touching it. Without this, a tab left open past midnight AST — say,
+ * sitting on the results screen after finishing at 11:58 pm — would hand
+ * "Play again" the exact same (now yesterday's) puzzle it served hours
+ * earlier, because nothing had ever invalidated the promise.
  */
 let dailyPromise: Promise<DailyPuzzle> | null = null;
+let dailyPromiseAstDate: string | null = null;
 
 export function fetchDaily(): Promise<DailyPuzzle> {
-  dailyPromise ??= requestJson(DAILY_ENDPOINT, { method: 'GET', headers: { accept: 'application/json' } })
+  const today = todayInAst();
+  if (dailyPromiseAstDate !== null && dailyPromiseAstDate !== today) {
+    dailyPromise = null;
+    dailyPromiseAstDate = null;
+  }
+  if (dailyPromise === null) {
+    dailyPromiseAstDate = today;
+  }
+  dailyPromise ??= requestJson(
+    DAILY_ENDPOINT,
+    { method: 'GET', headers: { accept: 'application/json' } },
+    'daily',
+  )
     .then(parseDailyPuzzle)
     .catch((error: unknown) => {
       dailyPromise = null;
+      dailyPromiseAstDate = null;
       throw error;
     });
   return dailyPromise;
@@ -278,14 +344,19 @@ export function fetchDaily(): Promise<DailyPuzzle> {
  * double-effect just returns the same answer).
  */
 export function submitGuess(roundId: string, guess: LatLng): Promise<GuessResult> {
-  return requestJson(GUESS_ENDPOINT, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ roundId, lat: guess.lat, lng: guess.lng }),
-  }).then(parseGuessResult);
+  return requestJson(
+    GUESS_ENDPOINT,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ roundId, lat: guess.lat, lng: guess.lng }),
+    },
+    'guess',
+  ).then(parseGuessResult);
 }
 
 /** Test seam: drops the daily memo so each test starts from a cold client. */
 export function resetApiForTest(): void {
   dailyPromise = null;
+  dailyPromiseAstDate = null;
 }

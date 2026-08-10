@@ -569,3 +569,17 @@ th.results__points-col {
     padding: 26px 20px;
   }
 }
+
+/* ------------------- Guess failure (network errors) ------------------ */
+
+/* Same panel as a round result, recoloured: it occupies the same slot and the
+   player should read it as "the round didn't happen", not as a new surface. */
+.result-panel--error {
+  border-color: rgba(255, 93, 115, 0.55);
+}
+
+.result-panel__error-text {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--ink-dim);
+}

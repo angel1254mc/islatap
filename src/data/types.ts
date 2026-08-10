@@ -49,7 +49,15 @@ export interface GameLocation {
   lng: number;
 }
 
-/** The prompt string shown to the player and used in share text. */
-export function displayName(location: GameLocation): string {
+/**
+ * "Name, Municipio" when qualified, bare name otherwise.
+ *
+ * Typed structurally rather than as GameLocation so a round answer straight
+ * off /api/guess — which carries only lat, lng, name and municipio — can be
+ * rendered by the same helper. GameLocation still satisfies it, and so does
+ * a ResultRow, which is what lets Results.tsx import this from data/types
+ * instead of from data/locations and stay clear of the coordinate table.
+ */
+export function displayName(location: { name: string; municipio: string | null }): string {
   return location.municipio ? `${location.name}, ${location.municipio}` : location.name;
 }
