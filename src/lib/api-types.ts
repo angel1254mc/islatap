@@ -1,4 +1,5 @@
 import type { Category, Difficulty, Subtype } from '../data/types';
+import type { GuessTarget } from './target';
 
 /**
  * Wire contracts for the public endpoints, shared by api/ and the browser.
@@ -42,4 +43,54 @@ export interface DailyPayload {
   /** Calendar date in Puerto Rico, 'YYYY-MM-DD'. The client keys its history on this. */
   gameDate: string;
   rounds: DailyRound[];
+}
+
+/**
+ * What the round was scored against, and what the map draws on the reveal.
+ *
+ * Re-exported, not redeclared: src/lib/target.ts owns GuessTarget, because
+ * evaluateTarget() is the function that consumes it and both the server and the
+ * client score through that one function. A second structurally-identical
+ * declaration here would compile forever and drift the first time one side
+ * gains a variant.
+ *
+ * The discriminant is not a judgement call: every one of the 1088 locations has
+ * exactly one of geoid or radius_km and never both, enforced by a CHECK
+ * constraint. 1063 rows are shapes (Census boundaries); 25 are circles — 21
+ * landmarks like El Morro plus Isla Verde, La Perla, Levittown and Piñones,
+ * colloquial areas with no Census polygon.
+ *
+ * `geometry` inside it is the repo's Leaflet-ordered MultiPolygon: Ring[][]
+ * whose points are [lat, lng], NOT GeoJSON's [lng, lat]. It is the literal
+ * geometry the server scored against, so the polygon the player sees can never
+ * disagree with the points they got — the same invariant RoundOutcome.shape used
+ * to hold by capturing the shape at guess time.
+ *
+ * Worst case on the wire is ~8.6 KB (Utuado, geoid 72141); the median is ~1 KB.
+ * That is why shapes-pr.json (1.55 MB) can leave the critical path entirely.
+ */
+export type { GuessTarget } from './target';
+
+/** What the browser sends when a player taps the map. */
+export interface GuessRequest {
+  roundId: string;
+  lat: number;
+  lng: number;
+}
+
+/** Revealed only after a guess is scored — never in the daily payload. */
+export interface GuessAnswer {
+  lat: number;
+  lng: number;
+  name: string;
+  municipio: string | null;
+}
+
+export interface GuessResponse {
+  points: number;
+  distanceKm: number;
+  /** Inside the boundary shape, or inside the acceptance circle. */
+  inside: boolean;
+  answer: GuessAnswer;
+  target: GuessTarget;
 }
