@@ -289,6 +289,17 @@ describe('practice mode', () => {
     ).toBe(submitting);
   });
 
+  it('drops an outcome whose own key belongs to a different round', () => {
+    // The action key can match pendingKey while the row inside it describes
+    // some other round. The daily path cannot express that — it rebuilds the
+    // row from state.prompts — so practice has to be checked explicitly.
+    const submitting = gameReducer(READY(), { type: 'guess/start', guess: TAP });
+    const mismatched = { ...OUTCOME, key: 'practice-2' };
+    expect(
+      gameReducer(submitting, { type: 'guess/resolved', key: 'practice-1', outcome: mismatched }),
+    ).toBe(submitting);
+  });
+
   it('rejects a second tap while a practice guess is resolving', () => {
     const submitting = gameReducer(READY(), { type: 'guess/start', guess: TAP });
     expect(gameReducer(submitting, { type: 'guess/start', guess: { lat: 18.3, lng: -66.1 } })).toBe(

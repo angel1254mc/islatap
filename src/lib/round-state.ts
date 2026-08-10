@@ -119,6 +119,22 @@ export function promptFromDailyRound(round: DailyRound): PromptView {
   };
 }
 
+/**
+ * Whether a guess resolution should be applied at all.
+ *
+ * A response for anything other than the round we are waiting on is stale — a
+ * retry that raced its own first attempt, or a reply that outlived its round.
+ * Dropping it keeps outcomes[] at exactly one entry per played round, which is
+ * the invariant totalScore depends on.
+ *
+ * Daily (`guess/ok`), practice (`guess/resolved`) and failure (`guess/fail`)
+ * all route through this one predicate on purpose. Three copies of the same
+ * two comparisons agree only until someone hardens one and forgets the others.
+ */
+function acceptsResolution(state: GameState, key: string): boolean {
+  return state.phase === 'submitting' && key === state.pendingKey;
+}
+
 function playedRound(prompt: PromptView, guess: LatLng, result: GuessResult): PlayedRound {
   const row: PlayedRound = {
     key: prompt.key,
@@ -211,12 +227,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'guess/ok': {
-      if (state.phase !== 'submitting') return state;
-      // A response for anything other than the round we are waiting on is
-      // stale — a retry that raced its own first attempt, or a reply that
-      // outlived its round. Dropping it keeps outcomes[] at exactly one entry
-      // per played round, which is the invariant totalScore depends on.
-      if (action.key !== state.pendingKey) return state;
+      if (!acceptsResolution(state, action.key)) return state;
       const prompt = state.prompts[state.roundIndex];
       const guess = state.pendingGuess;
       if (!prompt || !guess) return state;
@@ -232,11 +243,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'guess/resolved': {
       // Practice scores locally, so it hands the reducer a finished round
-      // instead of a server response — but it goes through the same phase and
-      // stale-key checks, so the double-tap and wrong-round guards apply
-      // identically in both modes.
-      if (state.phase !== 'submitting') return state;
-      if (action.key !== state.pendingKey) return state;
+      // instead of a server response — but it goes through the same
+      // acceptsResolution() check, so the double-tap and wrong-round guards
+      // apply identically in both modes.
+      if (!acceptsResolution(state, action.key)) return state;
+      // The daily path rebuilds its row from state.prompts, so it cannot append
+      // a row belonging to another round. Practice supplies the row ready-made,
+      // so the same guarantee has to be checked rather than constructed.
+      const prompt = state.prompts[state.roundIndex];
+      if (!prompt || action.outcome.key !== prompt.key) return state;
       return {
         ...state,
         phase: 'revealed',
@@ -248,7 +263,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'guess/fail':
-      if (state.phase !== 'submitting' || action.key !== state.pendingKey) return state;
+      if (!acceptsResolution(state, action.key)) return state;
       // pendingGuess survives on purpose: the player tapped a specific pixel
       // and should not have to reproduce it because the network blinked.
       return { ...state, phase: 'guess-error', errorMessage: action.message };
