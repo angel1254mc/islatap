@@ -307,3 +307,38 @@ describe('practice mode', () => {
     );
   });
 });
+
+describe('restoring an already-played day', () => {
+  const ROWS = [
+    { key: 'r1', name: 'Hato Rey', municipio: 'San Juan', points: 4321, distanceKm: 1.5, inside: false },
+    { key: 'r2', name: 'Adjuntas', municipio: null, points: 5000, distanceKm: 0, inside: true },
+  ];
+
+  it('jumps straight to the results screen with the stored rows', () => {
+    const state = run(
+      { type: 'daily/load-start' },
+      { type: 'daily/restore', gameDate: '2026-08-05', rows: ROWS },
+    );
+    expect(state.phase).toBe('results');
+    expect(state.gameDate).toBe('2026-08-05');
+    expect(state.restoredRows).toEqual(ROWS);
+    // outcomes stays empty: nothing was played this session, and the reveal
+    // data (geometry, tapped points) was deliberately not persisted.
+    expect(state.outcomes).toEqual([]);
+  });
+
+  it('does not clobber a game already in progress', () => {
+    const playing = run({ type: 'daily/load-start' }, { type: 'daily/load-ok', puzzle: PUZZLE });
+    expect(gameReducer(playing, { type: 'daily/restore', gameDate: '2026-08-05', rows: ROWS })).toBe(
+      playing,
+    );
+  });
+
+  it('clears any restored rows when a fresh load starts', () => {
+    const restored = run(
+      { type: 'daily/load-start' },
+      { type: 'daily/restore', gameDate: '2026-08-05', rows: ROWS },
+    );
+    expect(gameReducer(restored, { type: 'practice/load-start' }).restoredRows).toBeNull();
+  });
+});

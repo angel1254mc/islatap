@@ -73,6 +73,12 @@ export interface GameState {
   prompts: PromptView[];
   roundIndex: number;
   outcomes: PlayedRound[];
+  /**
+   * Scoreboard rows read back from storage for a day already played. Kept
+   * separate from `outcomes` because a restored day has no tapped points and
+   * no geometry — only enough to redraw the table.
+   */
+  restoredRows: ResultRow[] | null;
   /** The tapped point awaiting — or having failed — a server answer. */
   pendingGuess: LatLng | null;
   /** Which round the in-flight guess belongs to; stale responses are dropped. */
@@ -84,6 +90,7 @@ export type GameAction =
   | { type: 'daily/load-start' }
   | { type: 'daily/load-ok'; puzzle: DailyPuzzle }
   | { type: 'daily/load-fail'; message: string }
+  | { type: 'daily/restore'; gameDate: string; rows: ResultRow[] }
   | { type: 'practice/load-start' }
   | { type: 'practice/ready'; prompts: PromptView[] }
   | { type: 'guess/start'; guess: LatLng }
@@ -100,6 +107,7 @@ export const INITIAL_GAME_STATE: GameState = {
   prompts: [],
   roundIndex: 0,
   outcomes: [],
+  restoredRows: null,
   pendingGuess: null,
   pendingKey: null,
   errorMessage: null,
@@ -182,6 +190,18 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         errorMessage: null,
       };
     }
+
+    case 'daily/restore':
+      // Only meaningful while the puzzle is still loading: once a game is in
+      // progress, a late restore would wipe it.
+      if (state.phase !== 'loading') return state;
+      return {
+        ...state,
+        phase: 'results',
+        gameDate: action.gameDate,
+        restoredRows: action.rows,
+        errorMessage: null,
+      };
 
     case 'daily/load-fail':
       if (state.phase !== 'loading') return state;
