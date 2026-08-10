@@ -7,31 +7,61 @@ import RoundResult from './components/RoundResult';
 import StartScreen from './components/StartScreen';
 import StatusScreen from './components/StatusScreen';
 import { fetchDaily, submitGuess, userMessage } from './lib/api';
-import { loadBestScore, saveBestScore } from './lib/game';
+import {
+  bestTotal,
+  entryFor,
+  loadHistory,
+  nextDate,
+  previousDate,
+  recordDay,
+  streakEndingAt,
+  type DayEntry,
+  type GameHistory,
+} from './lib/history';
 import { loadPracticeGame, scorePracticeGuess } from './lib/practice';
 import { INITIAL_GAME_STATE, gameReducer, totalScoreOf } from './lib/round-state';
 import { MAX_ROUND_POINTS, type LatLng } from './lib/scoring';
-import { startShapeLoad } from './lib/shapes';
 import type { GameLocation } from './data/types';
 
 export default function App() {
   const [state, dispatch] = useReducer(gameReducer, INITIAL_GAME_STATE);
-  const [bestScore, setBestScore] = useState<number | null>(() => loadBestScore());
+  // Lazy initialiser: this runs during the first render, so loadHistory is
+  // written to never throw — the app has no error boundary and a corrupted
+  // blob would otherwise be a white screen.
+  const [history, setHistory] = useState<GameHistory>(() => loadHistory());
   const [isNewBest, setIsNewBest] = useState(false);
+  const bestScore = useMemo(() => bestTotal(history), [history]);
   // Parallel to state.prompts: practice scores locally, so it needs the full
   // location (coordinates and all) that each prompt was made from. Daily
   // never populates this — its answers only exist on the server.
   const [practiceLocations, setPracticeLocations] = useState<GameLocation[]>([]);
 
-  // Boundary shapes still load at mount here; a later task moves this off the
-  // critical path now that the daily reveal gets its geometry from the guess
-  // response instead of from this file.
-  useEffect(() => {
-    void startShapeLoad();
-  }, []);
-
   const totalScore = useMemo(() => totalScoreOf(state.outcomes), [state.outcomes]);
-  const maxScore = state.prompts.length * MAX_ROUND_POINTS;
+  // A restored day has no outcomes this session; a freshly played one has no
+  // restoredRows. Exactly one of the two is populated whenever phase is
+  // 'results'.
+  const resultRows = state.restoredRows ?? state.outcomes;
+  const maxScore = (state.prompts.length || resultRows.length) * MAX_ROUND_POINTS;
+  const streak = state.gameDate ? streakEndingAt(history, state.gameDate) : 0;
+
+  // The start screen has no server gameDate yet — nothing has been fetched —
+  // so it anchors on the client's own Atlantic Standard Time calendar day.
+  // 'en-CA' is the locale whose short date format is exactly YYYY-MM-DD, and
+  // America/Puerto_Rico is UTC-4 all year, so this is the same string
+  // /api/daily will call today.
+  //
+  // Anchoring instead on "the most recent date on record" would print a proud
+  // 🔥 5 to somebody whose last five games ended a month ago; a streak that
+  // survives not playing is not a streak. Today OR yesterday counts as live,
+  // because today is not over and not having played it yet is not a break.
+  const clientToday = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Puerto_Rico',
+  }).format(new Date());
+  const liveStreak = Math.max(
+    streakEndingAt(history, clientToday),
+    streakEndingAt(history, previousDate(clientToday)),
+  );
+
   const currentPrompt = state.prompts[state.roundIndex];
   const lastOutcome = state.outcomes[state.outcomes.length - 1];
   const revealed = state.phase === 'revealed';
@@ -47,7 +77,17 @@ export default function App() {
     let live = true;
     void fetchDaily()
       .then((puzzle) => {
-        if (live) dispatch({ type: 'daily/load-ok', puzzle });
+        if (!live) return;
+        // Same-day reload: show the finished scoreboard instead of dealing the
+        // same five prompts out again. The server would happily rescore them —
+        // /api/guess is stateless — so this guard is the only thing that makes
+        // "one puzzle a day" true.
+        const played = entryFor(history, puzzle.gameDate);
+        if (played) {
+          dispatch({ type: 'daily/restore', gameDate: puzzle.gameDate, rows: played.rows });
+          return;
+        }
+        dispatch({ type: 'daily/load-ok', puzzle });
       })
       .catch((error: unknown) => {
         if (live) dispatch({ type: 'daily/load-fail', message: userMessage(error) });
@@ -55,7 +95,9 @@ export default function App() {
     return () => {
       live = false;
     };
-  }, [state.mode, state.phase]);
+    // No loop: the effect body returns immediately unless phase === 'loading',
+    // and history only changes on the transition into 'results'.
+  }, [state.mode, state.phase, history]);
 
   // ---- build a practice game ------------------------------------------
   useEffect(() => {
@@ -113,15 +155,38 @@ export default function App() {
     };
   }, [state.phase, state.mode, state.roundIndex, state.pendingKey, state.pendingGuess, practiceLocations]);
 
-  // ---- best score -------------------------------------------------------
+  // ---- persist a finished daily puzzle ---------------------------------
   useEffect(() => {
     if (state.phase !== 'results' || state.mode !== 'daily') return;
-    if (bestScore === null || totalScore > bestScore) {
-      setBestScore(totalScore);
-      setIsNewBest(true);
-      saveBestScore(totalScore);
-    }
-  }, [state.phase, state.mode, totalScore, bestScore]);
+    const gameDate = state.gameDate;
+    if (!gameDate || state.outcomes.length === 0) return; // restored day: already stored
+    // Decided out here, not inside the setHistory updater. Updaters must be
+    // pure: React 19 StrictMode double-invokes them in development, so a
+    // setIsNewBest() or a localStorage write in there fires twice, and React
+    // is free to re-run them at any time for its own reasons.
+    if (history.days[gameDate]) return;
+    const previousBest = bestTotal(history);
+    if (previousBest === null || totalScore > previousBest) setIsNewBest(true);
+
+    const entry: DayEntry = {
+      total: totalScore,
+      // Structural subset of PlayedRound — the geometry and the tapped
+      // points are dropped on purpose.
+      rows: state.outcomes.map((outcome) => ({
+        key: outcome.key,
+        name: outcome.name,
+        municipio: outcome.municipio,
+        subtype: outcome.subtype,
+        points: outcome.points,
+        distanceKm: outcome.distanceKm,
+        inside: outcome.inside,
+      })),
+      playedAt: new Date().toISOString(),
+    };
+    // The updater is now a pure "write it unless it is already there", which
+    // is safe to run twice: recordDay is itself first-write-wins.
+    setHistory((prev) => (prev.days[gameDate] ? prev : recordDay(prev, gameDate, entry)));
+  }, [state.phase, state.mode, state.gameDate, state.outcomes, totalScore, history]);
 
   const startDaily = useCallback(() => {
     setIsNewBest(false);
@@ -189,7 +254,12 @@ export default function App() {
       )}
 
       {state.phase === 'start' && (
-        <StartScreen bestScore={bestScore} onPlayDaily={startDaily} onPlayPractice={startPractice} />
+        <StartScreen
+          bestScore={bestScore}
+          streak={liveStreak}
+          onPlayDaily={startDaily}
+          onPlayPractice={startPractice}
+        />
       )}
 
       {state.phase === 'loading' && (
@@ -214,11 +284,14 @@ export default function App() {
 
       {state.phase === 'results' && (
         <Results
-          rows={state.outcomes}
-          totalScore={totalScore}
+          rows={resultRows}
+          totalScore={state.restoredRows ? totalScoreOf(state.restoredRows) : totalScore}
           maxScore={maxScore}
           bestScore={bestScore}
           isNewBest={isNewBest}
+          gameDate={state.mode === 'daily' ? state.gameDate : null}
+          streak={state.mode === 'daily' ? streak : 0}
+          nextPuzzleDate={state.mode === 'daily' && state.gameDate ? nextDate(state.gameDate) : null}
           // One daily puzzle per day: replaying it is not on offer.
           onPlayAgain={state.mode === 'practice' ? startPractice : null}
         />

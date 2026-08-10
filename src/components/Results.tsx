@@ -17,6 +17,11 @@ interface ResultsProps {
   maxScore: number;
   bestScore: number | null;
   isNewBest: boolean;
+  /** 'YYYY-MM-DD' for a daily puzzle; null for practice. */
+  gameDate: string | null;
+  streak: number;
+  /** 'YYYY-MM-DD' of the next puzzle; null for practice. */
+  nextPuzzleDate: string | null;
   /** Null when replaying is not offered (the daily puzzle is once a day). */
   onPlayAgain: (() => void) | null;
 }
@@ -27,6 +32,9 @@ export default function Results({
   maxScore,
   bestScore,
   isNewBest,
+  gameDate,
+  streak,
+  nextPuzzleDate,
   onPlayAgain,
 }: ResultsProps) {
   const [copied, setCopied] = useState(false);
@@ -37,7 +45,12 @@ export default function Results({
   }, []);
 
   const copyResult = async () => {
-    const text = buildShareText(rows, { total: totalScore, maxTotal: maxScore });
+    const text = buildShareText(rows, {
+      total: totalScore,
+      maxTotal: maxScore,
+      gameDate,
+      streak,
+    });
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -68,6 +81,7 @@ export default function Results({
             Best score: {bestScore !== null ? bestScore.toLocaleString('en-US') : '—'}
           </p>
         )}
+        {streak > 1 && <p className="results__streak">🔥 {streak} days in a row</p>}
 
         <div className="results__table-wrap">
           <table className="results__table">
@@ -99,10 +113,16 @@ export default function Results({
           <button type="button" className="btn btn--ghost" onClick={() => void copyResult()}>
             {copied ? 'Copied ✓' : 'Copy result'}
           </button>
-          {onPlayAgain && (
+          {onPlayAgain ? (
             <button type="button" className="btn btn--primary" onClick={onPlayAgain}>
               Play again
             </button>
+          ) : (
+            nextPuzzleDate && (
+              <p className="results__tomorrow">
+                Vuelve mañana — the next puzzle drops <strong>{nextPuzzleDate}</strong>.
+              </p>
+            )
           )}
         </div>
       </div>

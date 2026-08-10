@@ -32,10 +32,9 @@ export interface RoundOutcome {
  * The scoring rules themselves live in ./target (evaluateTarget), NOT here,
  * because api/guess.ts has to apply exactly the same rules and cannot import
  * this file: line 1 pulls LOCATIONS in as a value, which would bundle all
- * 1088 coordinates into the serverless function, and loadBestScore below
- * touches window.localStorage. Keeping the geometry rules in a dependency-free
- * module is what stops the server's score and the client's reveal from drifting
- * apart.
+ * 1088 coordinates into the serverless function. Keeping the geometry rules in
+ * a dependency-free module is what stops the server's score and the client's
+ * reveal from drifting apart.
  *
  * What stays here is the shape of RoundOutcome: the location echo and the
  * (shape, acceptRadiusKm) pair the map needs to draw the reveal.
@@ -106,25 +105,4 @@ export function pickGameRounds(pool: readonly GameLocation[] = LOCATIONS): GameL
   }
 
   return shuffle(picked);
-}
-
-const BEST_SCORE_KEY = 'islatap:best-score';
-
-export function loadBestScore(): number | null {
-  try {
-    const raw = window.localStorage.getItem(BEST_SCORE_KEY);
-    if (raw === null) return null;
-    const value = Number(raw);
-    return Number.isFinite(value) ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveBestScore(score: number): void {
-  try {
-    window.localStorage.setItem(BEST_SCORE_KEY, String(score));
-  } catch {
-    // Storage unavailable (private mode, etc.) — best score just won't persist.
-  }
 }

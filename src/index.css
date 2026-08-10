@@ -592,3 +592,27 @@ th.results__points-col {
   align-items: center;
   gap: 10px;
 }
+
+/* ---------------------- Streak / next puzzle ------------------------- */
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.results__streak {
+  margin: 4px 0 0;
+  font-weight: 700;
+  color: var(--sun);
+}
+
+/* Occupies the slot where "Play again" sits in practice, so the daily
+   results screen does not visually collapse when the replay is withheld. */
+.results__tomorrow {
+  margin: 0;
+  align-self: center;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
