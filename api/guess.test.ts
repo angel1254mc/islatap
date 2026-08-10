@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { MultiPolygon } from '../src/lib/scoring';
 import type { SqlExecutor, SqlRow } from './_lib/db';
@@ -220,6 +223,43 @@ describe('POST /api/guess — success', () => {
     const response = await handler(post({ roundId: ROUND_ID, lat: 18.05, lng: -66.45 }));
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: 'guess-unavailable' });
+  });
+});
+
+describe('guess.ts scores only through the shared target module', () => {
+  // Task 4 extracted src/lib/target.ts specifically so this handler and the
+  // client's reveal can never disagree about the same guess. Reaching past it
+  // to a scoring primitive would rebuild that divergence, so the boundary is
+  // asserted on the source text rather than left to code review.
+  const FORBIDDEN = [
+    'distanceToShapeKm',
+    'pointInMultiPolygon',
+    'distanceToCircleKm',
+    'scoreForDistance',
+  ];
+
+  /** Every binding `file` imports, across single- and multi-line import statements. */
+  const importedBindings = (file: string): string[] => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(join(here, file), 'utf8');
+    return [...source.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s*from/g)].flatMap((match) =>
+      match[1]
+        .split(',')
+        .map((binding) => binding.trim().split(/\s+as\s+/)[0].trim())
+        .filter(Boolean),
+    );
+  };
+
+  it('imports none of the four scoring primitives', () => {
+    const bindings = importedBindings('guess.ts');
+
+    // Sanity-check the extractor itself, so this cannot pass by parsing nothing.
+    expect(bindings).toContain('evaluateTarget');
+    expect(bindings).toContain('targetForShapeOrRadius');
+
+    for (const name of FORBIDDEN) {
+      expect(bindings).not.toContain(name);
+    }
   });
 });
 
