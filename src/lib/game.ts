@@ -1,5 +1,5 @@
-import { LOCATIONS, displayName, type Category, type GameLocation } from '../data/locations';
-import { MAX_ROUND_POINTS, formatDistance, type LatLng, type MultiPolygon } from './scoring';
+import { LOCATIONS, type Category, type GameLocation } from '../data/locations';
+import { MAX_ROUND_POINTS, type LatLng, type MultiPolygon } from './scoring';
 import { evaluateTarget, targetForShapeOrRadius } from './target';
 
 export const ROUNDS_PER_GAME = 5;
@@ -127,23 +127,4 @@ export function saveBestScore(score: number): void {
   } catch {
     // Storage unavailable (private mode, etc.) — best score just won't persist.
   }
-}
-
-const ROUND_EMOJI = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'] as const;
-
-function medalFor(points: number): string {
-  if (points >= 4500) return '🟩';
-  if (points >= 3000) return '🟨';
-  if (points >= 1500) return '🟧';
-  return '🟥';
-}
-
-export function buildShareText(outcomes: readonly RoundOutcome[], total: number): string {
-  const header = `IslaTap — ${total.toLocaleString('en-US')} / ${MAX_GAME_POINTS.toLocaleString('en-US')} 🇵🇷`;
-  const lines = outcomes.map((outcome, index) => {
-    const badge = ROUND_EMOJI[index] ?? `${index + 1}.`;
-    const distanceLabel = outcome.inside ? '¡Adentro!' : formatDistance(outcome.distanceKm);
-    return `${badge} ${medalFor(outcome.points)} ${displayName(outcome.location)} — ${distanceLabel} — ${outcome.points.toLocaleString('en-US')}`;
-  });
-  return [header, ...lines].join('\n');
 }
