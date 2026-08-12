@@ -6,6 +6,7 @@ import type { MultiPolygon } from '../src/lib/scoring.js';
 import type { SqlExecutor, SqlRow } from './_lib/db.js';
 import { setSqlForTest } from './_lib/db.js';
 import { POST as handler, GUESS_ROUND_SQL, parseAnswerRow, scoreGuess } from './guess.js';
+import { WARM_GUESS_BODY } from '../src/lib/api.js';
 
 const ROUND_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -269,5 +270,23 @@ describe('GUESS_ROUND_SQL', () => {
     // write path in production is the nightly top-up job; anything else here
     // would need session state the design deliberately does not have.
     expect(GUESS_ROUND_SQL).not.toMatch(/\b(INSERT|UPDATE|DELETE)\b/i);
+  });
+});
+
+describe('the prewarm body cannot reach the database', () => {
+  // src/lib/api.ts fires WARM_GUESS_BODY at this endpoint on every page load,
+  // purely to pay the function's cold start. That is only acceptable while the
+  // body is rejected before the round lookup. If guessBodySchema is ever
+  // loosened so this validates, every page load silently becomes a real
+  // database query for a round id that does not exist.
+  it('is rejected with 400 before any query is issued', async () => {
+    setSqlForTest(async () => {
+      throw new Error('the database must not be reached');
+    });
+
+    const response = await handler(post(WARM_GUESS_BODY));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).not.toHaveProperty('points');
   });
 });

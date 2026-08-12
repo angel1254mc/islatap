@@ -355,8 +355,66 @@ export function submitGuess(roundId: string, guess: LatLng): Promise<GuessResult
   ).then(parseGuessResult);
 }
 
+/**
+ * A guess body /api/guess is guaranteed to reject.
+ *
+ * `roundId` is not a uuid and {0, 0} sits far outside the Puerto Rico
+ * envelope, so guessBodySchema rejects it twice over. That is the whole point:
+ * api/guess.ts validates BEFORE the round lookup, so this request warms the
+ * function without ever reaching the database. api/guess.test.ts asserts
+ * exactly that against the real handler, which is what keeps this safe if the
+ * schema is ever loosened.
+ *
+ * An object rather than a pre-serialised string, so warmGuess and that test
+ * stringify the same value and cannot drift apart.
+ */
+export const WARM_GUESS_BODY = { roundId: 'warm', lat: 0, lng: 0 };
+
+/**
+ * Whether this page load has already warmed the guess function.
+ *
+ * Set before the request rather than after it, so a failed warm-up is not
+ * retried. There is nothing to gain by retrying: the player's next real guess
+ * pays the cold start regardless, and a retry loop against a dead network
+ * would be worse than doing nothing.
+ */
+let guessWarmed = false;
+
+/**
+ * Pay the guess function's cold start before the player's first tap.
+ *
+ * /api/daily and /api/guess are separate Vercel functions, so fetching the
+ * puzzle warms neither the guess lambda nor its module graph (zod,
+ * src/lib/target.ts, src/lib/scoring.ts). Firing a request the handler is
+ * certain to reject moves that cost off the critical path and into the seconds
+ * the player spends reading the first prompt.
+ *
+ * Not a GET: api/guess.ts exports only POST and Vercel routes by method, so a
+ * GET may be answered 405 by the platform dispatcher without ever entering the
+ * module — which is the cold start being paid down.
+ *
+ * Never rejects. The 400 is the expected outcome, not a failure.
+ */
+export function warmGuess(): Promise<void> {
+  if (guessWarmed) return Promise.resolve();
+  guessWarmed = true;
+  return requestJson(
+    GUESS_ENDPOINT,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify(WARM_GUESS_BODY),
+    },
+    'guess',
+  ).then(
+    () => undefined,
+    () => undefined,
+  );
+}
+
 /** Test seam: drops the daily memo so each test starts from a cold client. */
 export function resetApiForTest(): void {
   dailyPromise = null;
   dailyPromiseAstDate = null;
+  guessWarmed = false;
 }

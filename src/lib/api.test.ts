@@ -2,11 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
   fetchDaily,
+  GUESS_ENDPOINT,
   parseDailyPuzzle,
   parseGuessResult,
   resetApiForTest,
   submitGuess,
   userMessage,
+  WARM_GUESS_BODY,
+  warmGuess,
 } from './api';
 
 // A minimal well-formed daily payload. Note what is NOT here: no geoid, no
@@ -308,5 +311,48 @@ describe('userMessage', () => {
     expect(guessMessage).not.toBe(dailyMessage);
     expect(guessMessage).not.toMatch(/not ready/i);
     expect(dailyMessage).toMatch(/not ready/i);
+  });
+});
+
+describe('warmGuess', () => {
+  /** What /api/guess actually answers a warm-up with: a 400 it never queried for. */
+  function rejected400() {
+    return { ok: false, status: 400, json: async () => ({ error: 'invalid-guess' }) };
+  }
+
+  it('POSTs the body the server is meant to reject', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(rejected400());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await warmGuess();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(GUESS_ENDPOINT);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual(WARM_GUESS_BODY);
+  });
+
+  it('fires once per session however many times it is called', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(rejected400());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await Promise.all([warmGuess(), warmGuess()]);
+    await warmGuess();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves on the 400 it expects, because that is success here', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(rejected400()));
+    await expect(warmGuess()).resolves.toBeUndefined();
+  });
+
+  it('resolves rather than rejecting when the network is dead', async () => {
+    // A rejection here would surface in App as an unhandled promise. The
+    // warm-up is best-effort: if it fails, the next real guess just pays the
+    // cold start exactly as it does today.
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    await expect(warmGuess()).resolves.toBeUndefined();
   });
 });
