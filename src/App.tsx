@@ -6,7 +6,7 @@ import RoundPrompt from './components/RoundPrompt';
 import RoundResult from './components/RoundResult';
 import StartScreen from './components/StartScreen';
 import StatusScreen from './components/StatusScreen';
-import { fetchDaily, submitGuess, userMessage } from './lib/api';
+import { fetchDaily, submitGuess, userMessage, warmGuess } from './lib/api';
 import {
   bestTotal,
   entryFor,
@@ -20,6 +20,7 @@ import {
 } from './lib/history';
 import { loadPracticeGame, scorePracticeGuess } from './lib/practice';
 import { INITIAL_GAME_STATE, gameReducer, totalScoreOf } from './lib/round-state';
+import { MIN_PING_MS, notBefore } from './lib/pacing';
 import { MAX_ROUND_POINTS, type LatLng } from './lib/scoring';
 import type { GameLocation } from './data/types';
 
@@ -75,6 +76,13 @@ export default function App() {
   useEffect(() => {
     if (state.mode !== 'daily' || state.phase !== 'loading') return;
     let live = true;
+    // Fired alongside the puzzle fetch rather than after it. /api/daily and
+    // /api/guess are separate Vercel functions, and the seconds the player
+    // spends reading the first prompt are exactly the budget available to pay
+    // the guess function's cold start. Never awaited, never able to reject,
+    // and memoised to once per page load — so it costs a returning player who
+    // already finished today one throwaway 400 and nothing else.
+    void warmGuess();
     void fetchDaily()
       .then((puzzle) => {
         if (!live) return;
@@ -134,17 +142,25 @@ export default function App() {
     if (!key || !guess) return;
     let live = true;
 
+    // Both branches go through the same floor. Practice scores locally and
+    // returns almost instantly, so without this the ping would flash for a
+    // frame there while the daily mode showed a full cycle — two modes that
+    // should feel identical feeling nothing alike.
     const resolve =
       state.mode === 'daily'
-        ? submitGuess(key, guess).then((result) => {
+        ? notBefore(submitGuess(key, guess), MIN_PING_MS).then((result) => {
             if (live) dispatch({ type: 'guess/ok', key, result });
           })
-        : (async () => {
-            const location = practiceLocations[state.roundIndex];
-            if (!location) throw new Error('practice round has no location');
-            const outcome = await scorePracticeGuess(location, guess);
+        : notBefore(
+            (async () => {
+              const location = practiceLocations[state.roundIndex];
+              if (!location) throw new Error('practice round has no location');
+              return scorePracticeGuess(location, guess);
+            })(),
+            MIN_PING_MS,
+          ).then((outcome) => {
             if (live) dispatch({ type: 'guess/resolved', key, outcome });
-          })();
+          });
 
     void resolve.catch((error: unknown) => {
       if (live) dispatch({ type: 'guess/fail', key, message: userMessage(error) });
