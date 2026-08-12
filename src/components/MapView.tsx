@@ -109,6 +109,22 @@ function pinIcon(color: string): L.DivIcon {
 const GUESS_ICON = pinIcon('#ff5d73');
 const TARGET_ICON = pinIcon('#2dd4a7');
 
+/**
+ * The ping shown under the pin while a guess is in flight.
+ *
+ * A divIcon rather than a Leaflet <Circle>: a Circle's radius is in meters, so
+ * it would grow and shrink with zoom and would need a JS animation loop to
+ * expand. This is a UI affordance, not a geographic quantity — it wants a fixed
+ * pixel size at every zoom level, which CSS gives for free while Leaflet keeps
+ * the icon anchored to the tapped coordinate through pans and zooms.
+ */
+const SONAR_ICON = L.divIcon({
+  className: 'sonar-icon',
+  html: '<span class="sonar-ring"></span><span class="sonar-ring"></span><span class="sonar-ring"></span>',
+  iconSize: [140, 140],
+  iconAnchor: [70, 70],
+});
+
 interface ClickHandlerProps {
   enabled: boolean;
   onGuess: (guess: LatLng) => void;
@@ -186,6 +202,8 @@ function ViewController({
 interface MapViewProps {
   roundIndex: number;
   interactive: boolean;
+  /** A guess is in flight: show the ping. False in 'guess-error', so the rings stop while the retry panel is up. */
+  pending: boolean;
   revealed: boolean;
   guess: LatLng | null;
   target: TargetView | null;
@@ -198,6 +216,7 @@ interface MapViewProps {
 export default function MapView({
   roundIndex,
   interactive,
+  pending,
   revealed,
   guess,
   target,
@@ -259,6 +278,31 @@ export default function MapView({
           />
         )}
 
+        {pending && guess && (
+          <Marker
+            position={[guess.lat, guess.lng]}
+            icon={SONAR_ICON}
+            interactive={false}
+            zIndexOffset={-1000}
+          />
+        )}
+
+        {guess && (
+          // Outside the `revealed` block on purpose. The marker mounts the
+          // instant the player taps and must stay mounted through the reveal:
+          // remounting it replays the pin-drop animation in index.css, and the
+          // pin re-dropping is exactly what makes the reveal feel like one
+          // simultaneous event instead of the answer arriving to meet a pin
+          // that is already there.
+          <Marker position={[guess.lat, guess.lng]} icon={GUESS_ICON}>
+            {revealed && (
+              <Tooltip direction="top" permanent className="map-tag map-tag--guess">
+                {inside ? '¡Adentro!' : 'Tu toque'}
+              </Tooltip>
+            )}
+          </Marker>
+        )}
+
         {revealed && guess && target && (
           <>
             {lineEnd && (
@@ -276,11 +320,6 @@ export default function MapView({
                 }}
               />
             )}
-            <Marker position={[guess.lat, guess.lng]} icon={GUESS_ICON}>
-              <Tooltip direction="top" permanent className="map-tag map-tag--guess">
-                {inside ? '¡Adentro!' : 'Tu toque'}
-              </Tooltip>
-            </Marker>
             <Marker position={[target.lat, target.lng]} icon={TARGET_ICON}>
               <Tooltip direction="top" permanent className="map-tag map-tag--target">
                 {target.name}

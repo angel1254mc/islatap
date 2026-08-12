@@ -92,6 +92,66 @@ button {
   }
 }
 
+/* The ping that fills the gap between a tap and the server's answer. Three
+   rings on staggered delays read as one repeating pulse rather than three
+   separate animations; at a 1.8s cycle they emit one ring every 600ms, which
+   is deliberately MIN_PING_MS from src/lib/pacing.ts — the floor is exactly
+   one ring. */
+.sonar-icon {
+  background: none;
+  border: none;
+  pointer-events: none;
+}
+
+.sonar-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 140px;
+  height: 140px;
+  margin: -70px 0 0 -70px;
+  border: 2px solid var(--coral);
+  border-radius: 50%;
+  opacity: 0;
+  animation: sonar-ping 1.8s cubic-bezier(0.15, 0.6, 0.4, 1) infinite;
+}
+
+.sonar-ring:nth-child(2) {
+  animation-delay: 0.6s;
+}
+
+.sonar-ring:nth-child(3) {
+  animation-delay: 1.2s;
+}
+
+@keyframes sonar-ping {
+  from {
+    transform: scale(0.12);
+    opacity: 0.85;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* An indefinitely looping expanding ring is the textbook case for this query,
+   and the app had no reduced-motion handling at all before now. The 600ms
+   floor still applies — it paces the reveal, not the motion — so the timing is
+   identical either way. */
+@media (prefers-reduced-motion: reduce) {
+  .sonar-ring {
+    animation: none;
+    opacity: 0.45;
+    transform: scale(0.4);
+  }
+
+  .sonar-ring:nth-child(2),
+  .sonar-ring:nth-child(3) {
+    display: none;
+  }
+}
+
 .guess-line {
   animation: fade-in 0.6s ease 0.15s both;
 }

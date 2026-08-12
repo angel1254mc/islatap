@@ -223,8 +223,14 @@ export default function App() {
         // Only 'playing' arms the map. 'submitting' must not, or the click
         // handler would fire a second request for a round already answered.
         interactive={state.phase === 'playing'}
+        // A guess is in flight: MapView shows the ping.
+        pending={state.phase === 'submitting'}
         revealed={revealed}
-        guess={revealed && lastOutcome ? lastOutcome.guess : null}
+        // Non-null from the tap onward, not just at reveal. pendingGuess covers
+        // 'submitting' and 'guess-error'; lastOutcome.guess takes over at
+        // 'revealed', where the reducer has already nulled pendingGuess. Both
+        // are the same coordinate, so the pin never moves.
+        guess={state.pendingGuess ?? (revealed && lastOutcome ? lastOutcome.guess : null)}
         target={revealed && lastOutcome ? lastOutcome.answer : null}
         targetShape={revealed && lastOutcome ? lastOutcome.shape : null}
         targetRadiusKm={revealed && lastOutcome ? lastOutcome.acceptRadiusKm : null}
