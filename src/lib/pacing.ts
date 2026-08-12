@@ -14,6 +14,12 @@
  * elapsed and the reveal is immediate; it is only the fast tail that gets held
  * back, and only so far as one ring of the ping (see the `sonar-ping` keyframes
  * in index.css, which emit a ring every 600 ms).
+ *
+ * Coupled to CSS by comment only, not by a shared constant: `.sonar-ring`'s
+ * `animation` in src/index.css is `sonar-ping 1.8s ...`, and three rings over
+ * a 1.8s cycle is one ring every 600ms. If you change this value, change that
+ * `1.8s` to match (new cycle = 3 * MIN_PING_MS), or the floor and the ring it
+ * is supposed to be "exactly one ring" of will drift apart.
  */
 export const MIN_PING_MS = 600;
 

@@ -76,12 +76,23 @@ export default function App() {
   useEffect(() => {
     if (state.mode !== 'daily' || state.phase !== 'loading') return;
     let live = true;
-    // Fired alongside the puzzle fetch rather than after it. /api/daily and
-    // /api/guess are separate Vercel functions, and the seconds the player
-    // spends reading the first prompt are exactly the budget available to pay
-    // the guess function's cold start. Never awaited, never able to reject,
-    // and memoised to once per page load — so it costs a returning player who
-    // already finished today one throwaway 400 and nothing else.
+    // Fired alongside the puzzle fetch rather than after it, on the theory
+    // that the seconds the player spends reading the first prompt are budget
+    // available to pay down the guess function's cold start before their
+    // first tap — /api/daily and /api/guess are separate Vercel functions, so
+    // fetching the puzzle warms neither the guess lambda nor its module graph.
+    // Measuring this on the deployed preview did not prove a saving either
+    // way: the warm-up request returns 400 without touching the database, so
+    // its ~90ms isn't comparable to a real guess's ~228ms, and a true
+    // cold-vs-cold comparison wasn't constructible (Vercel may already warm a
+    // function during deployment). What the measurements did show is that the
+    // guess lambda's own cold start looks small, and the real first-load cost
+    // is Neon's compute waking — 1160ms cold vs 107ms warm — which
+    // /api/daily already pays down on its own. So this call is cheap insurance
+    // for an effect that may already be negligible, not a proven win. Never
+    // awaited, never able to reject, and memoised to once per page load — so
+    // it costs a returning player who already finished today one throwaway
+    // 400 and nothing else.
     void warmGuess();
     void fetchDaily()
       .then((puzzle) => {
@@ -142,10 +153,13 @@ export default function App() {
     if (!key || !guess) return;
     let live = true;
 
-    // Both branches go through the same floor. Practice scores locally and
-    // returns almost instantly, so without this the ping would flash for a
-    // frame there while the daily mode showed a full cycle — two modes that
-    // should feel identical feeling nothing alike.
+    // Both branches go through the same floor. Practice scores locally, but
+    // that is not instant: evaluateGuess walks large municipio MultiPolygons
+    // and measured 0.8-1.4s in a production build, close enough to a real
+    // daily round trip that skipping the floor here isn't the win it looks
+    // like — and without the floor, a faster practice round would flash the
+    // ping for a frame while the daily mode showed a full cycle, two modes
+    // that should feel identical feeling nothing alike.
     const resolve =
       state.mode === 'daily'
         ? notBefore(submitGuess(key, guess), MIN_PING_MS).then((result) => {

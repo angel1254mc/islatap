@@ -289,11 +289,18 @@ export default function MapView({
 
         {guess && (
           // Outside the `revealed` block on purpose. The marker mounts the
-          // instant the player taps and must stay mounted through the reveal:
-          // remounting it replays the pin-drop animation in index.css, and the
-          // pin re-dropping is exactly what makes the reveal feel like one
-          // simultaneous event instead of the answer arriving to meet a pin
-          // that is already there.
+          // instant the player taps and must stay mounted through the reveal.
+          // If it remounted, the pin-drop animation in index.css would replay
+          // and the coral pin would visibly bounce a second time, making the
+          // reveal read as one simultaneous event. Keeping it mounted is what
+          // staggers the reveal instead: your pin is already there, and the
+          // answer arrives to meet it.
+          //
+          // There is no automated test for this — the repo runs Vitest under
+          // `environment: 'node'` and has no component tests — so verify it by
+          // eye if you touch this block. Confirmed on the deployed preview by
+          // capturing the pin's DOM node while the guess was in flight and
+          // checking document.contains(node) after the reveal.
           <Marker position={[guess.lat, guess.lng]} icon={GUESS_ICON}>
             {revealed && (
               <Tooltip direction="top" permanent className="map-tag map-tag--guess">

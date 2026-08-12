@@ -368,7 +368,7 @@ export function submitGuess(roundId: string, guess: LatLng): Promise<GuessResult
  * An object rather than a pre-serialised string, so warmGuess and that test
  * stringify the same value and cannot drift apart.
  */
-export const WARM_GUESS_BODY = { roundId: 'warm', lat: 0, lng: 0 };
+export const WARM_GUESS_BODY = { roundId: 'warm', lat: 0, lng: 0 } as const;
 
 /**
  * Whether this page load has already warmed the guess function.
@@ -381,13 +381,20 @@ export const WARM_GUESS_BODY = { roundId: 'warm', lat: 0, lng: 0 };
 let guessWarmed = false;
 
 /**
- * Pay the guess function's cold start before the player's first tap.
+ * Try to pay the guess function's cold start before the player's first tap.
  *
  * /api/daily and /api/guess are separate Vercel functions, so fetching the
  * puzzle warms neither the guess lambda nor its module graph (zod,
  * src/lib/target.ts, src/lib/scoring.ts). Firing a request the handler is
  * certain to reject moves that cost off the critical path and into the seconds
- * the player spends reading the first prompt.
+ * the player spends reading the first prompt — that is the intent, not a
+ * measured result. On the deployed preview this could not be shown to save
+ * anything: the warm-up returns 400 without touching the database, so its
+ * ~90ms isn't comparable to a real guess's ~228ms, and a true cold-vs-cold
+ * comparison wasn't constructible because Vercel may already warm a function
+ * during deployment. The guess lambda's own cold start does appear small; the
+ * first-load cost that measurably matters is Neon's compute waking (1160ms
+ * cold, 107ms warm), which /api/daily already absorbs on its own.
  *
  * Not a GET: api/guess.ts exports only POST and Vercel routes by method, so a
  * GET may be answered 405 by the platform dispatcher without ever entering the

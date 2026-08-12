@@ -96,7 +96,10 @@ button {
    rings on staggered delays read as one repeating pulse rather than three
    separate animations; at a 1.8s cycle they emit one ring every 600ms, which
    is deliberately MIN_PING_MS from src/lib/pacing.ts — the floor is exactly
-   one ring. */
+   one ring. Coupled by comment only, not a shared constant: if you change the
+   1.8s cycle on `.sonar-ring`'s `animation` below, update MIN_PING_MS in
+   src/lib/pacing.ts to match (MIN_PING_MS = new cycle / 3), or the floor
+   stops lining up with a ring. */
 .sonar-icon {
   background: none;
   border: none;
