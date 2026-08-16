@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LOCATIONS, displayName, type GameLocation } from '../data/locations';
-import { ROUNDS_PER_GAME, evaluateGuess, pickGameRounds, buildShareText } from './game';
+import { ROUNDS_PER_GAME, evaluateGuess, pickGameRounds } from './game';
 import { MAX_ROUND_POINTS, type MultiPolygon } from './scoring';
 
 // Puerto Rico's bounding box, generous enough to include Mona, Desecheo and Culebra.
@@ -82,31 +82,6 @@ describe('pickGameRounds', () => {
   it('falls back gracefully when a pool is smaller than a full game', () => {
     const rounds = pickGameRounds(LOCATIONS.slice(0, 3));
     expect(rounds).toHaveLength(3);
-  });
-});
-
-describe('buildShareText', () => {
-  const base = {
-    location: LOCATIONS[0],
-    guess: { lat: 18.2, lng: -66.7 },
-  };
-
-  it('shows the distance for outside guesses', () => {
-    const text = buildShareText(
-      [{ ...base, distanceKm: 12.3, points: 1450, inside: false, shape: null, acceptRadiusKm: null }],
-      1450,
-    );
-    expect(text).toContain('12.3 km');
-    expect(text).not.toContain('¡Adentro!');
-  });
-
-  it('shows ¡Adentro! instead of a distance for inside guesses', () => {
-    const text = buildShareText(
-      [{ ...base, distanceKm: 0, points: 5000, inside: true, shape: null, acceptRadiusKm: null }],
-      5000,
-    );
-    expect(text).toContain('¡Adentro!');
-    expect(text).not.toContain('0 m');
   });
 });
 

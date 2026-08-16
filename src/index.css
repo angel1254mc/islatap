@@ -92,6 +92,69 @@ button {
   }
 }
 
+/* The ping that fills the gap between a tap and the server's answer. Three
+   rings on staggered delays read as one repeating pulse rather than three
+   separate animations; at a 1.8s cycle they emit one ring every 600ms, which
+   is deliberately MIN_PING_MS from src/lib/pacing.ts — the floor is exactly
+   one ring. Coupled by comment only, not a shared constant: if you change the
+   1.8s cycle on `.sonar-ring`'s `animation` below, update MIN_PING_MS in
+   src/lib/pacing.ts to match (MIN_PING_MS = new cycle / 3), or the floor
+   stops lining up with a ring. */
+.sonar-icon {
+  background: none;
+  border: none;
+  pointer-events: none;
+}
+
+.sonar-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 140px;
+  height: 140px;
+  margin: -70px 0 0 -70px;
+  border: 2px solid var(--coral);
+  border-radius: 50%;
+  opacity: 0;
+  animation: sonar-ping 1.8s cubic-bezier(0.15, 0.6, 0.4, 1) infinite;
+}
+
+.sonar-ring:nth-child(2) {
+  animation-delay: 0.6s;
+}
+
+.sonar-ring:nth-child(3) {
+  animation-delay: 1.2s;
+}
+
+@keyframes sonar-ping {
+  from {
+    transform: scale(0.12);
+    opacity: 0.85;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* An indefinitely looping expanding ring is the textbook case for this query,
+   and the app had no reduced-motion handling at all before now. The 600ms
+   floor still applies — it paces the reveal, not the motion — so the timing is
+   identical either way. */
+@media (prefers-reduced-motion: reduce) {
+  .sonar-ring {
+    animation: none;
+    opacity: 0.45;
+    transform: scale(0.4);
+  }
+
+  .sonar-ring:nth-child(2),
+  .sonar-ring:nth-child(3) {
+    display: none;
+  }
+}
+
 .guess-line {
   animation: fade-in 0.6s ease 0.15s both;
 }
@@ -568,4 +631,51 @@ th.results__points-col {
   .screen__card {
     padding: 26px 20px;
   }
+}
+
+/* ------------------- Guess failure (network errors) ------------------ */
+
+/* Same panel as a round result, recoloured: it occupies the same slot and the
+   player should read it as "the round didn't happen", not as a new surface. */
+.result-panel--error {
+  border-color: rgba(255, 93, 115, 0.55);
+}
+
+.result-panel__error-text {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+/* Daily is the headline action; practice is the escape hatch, so they stack
+   rather than sit side by side and compete for the same weight. */
+.start__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------------------- Streak / next puzzle ------------------------- */
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.results__streak {
+  margin: 4px 0 0;
+  font-weight: 700;
+  color: var(--sun);
+}
+
+/* Occupies the slot where "Play again" sits in practice, so the daily
+   results screen does not visually collapse when the replay is withheld. */
+.results__tomorrow {
+  margin: 0;
+  align-self: center;
+  font-size: 14px;
+  color: var(--ink-dim);
 }

@@ -1,9 +1,21 @@
 interface StartScreenProps {
   bestScore: number | null;
-  onPlay: () => void;
+  /**
+   * Consecutive days played, ending today or yesterday. Zero once the streak
+   * is broken — App anchors this on the client's AST calendar day rather than
+   * on the last date on record, so it cannot brag about a dead streak.
+   */
+  streak: number;
+  onPlayDaily: () => void;
+  onPlayPractice: () => void;
 }
 
-export default function StartScreen({ bestScore, onPlay }: StartScreenProps) {
+export default function StartScreen({
+  bestScore,
+  streak,
+  onPlayDaily,
+  onPlayPractice,
+}: StartScreenProps) {
   return (
     <div className="screen">
       <div className="screen__card">
@@ -17,16 +29,26 @@ export default function StartScreen({ bestScore, onPlay }: StartScreenProps) {
         <ul className="screen__rules">
           <li>📍 Read the prompt, then tap the satellite map as close as you can.</li>
           <li>📏 The closer your tap, the more you earn — up to 5,000 points a round.</li>
-          <li>🏆 25,000 is a perfect game. ¿Te atreves?</li>
+          <li>🗓️ Everyone gets the same five places each day. Practice is unlimited.</li>
         </ul>
-        {bestScore !== null && (
-          <div className="best-chip">
-            Best score <strong>{bestScore.toLocaleString('en-US')}</strong>
-          </div>
-        )}
-        <div>
-          <button type="button" className="btn btn--primary btn--big" onClick={onPlay}>
-            Play
+        <div className="chip-row">
+          {streak > 1 && (
+            <div className="best-chip">
+              Streak <strong>🔥 {streak}</strong>
+            </div>
+          )}
+          {bestScore !== null && (
+            <div className="best-chip">
+              Best score <strong>{bestScore.toLocaleString('en-US')}</strong>
+            </div>
+          )}
+        </div>
+        <div className="start__actions">
+          <button type="button" className="btn btn--primary btn--big" onClick={onPlayDaily}>
+            Today’s puzzle
+          </button>
+          <button type="button" className="btn btn--ghost" onClick={onPlayPractice}>
+            Practice
           </button>
         </div>
       </div>

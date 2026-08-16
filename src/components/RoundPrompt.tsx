@@ -1,4 +1,5 @@
-import type { Difficulty, GameLocation, Subtype } from '../data/locations';
+import type { Difficulty, Subtype } from '../data/types';
+import type { PromptView } from '../lib/round-state';
 
 // Labelled by subtype rather than category so a comunidad reads as a comunidad,
 // even though it shares the 'barrio' bucket (and therefore the tag colour).
@@ -17,38 +18,52 @@ const DIFFICULTY_LABELS: Record<Difficulty, string> = {
 };
 
 interface RoundPromptProps {
-  location: GameLocation;
+  prompt: PromptView;
   roundNumber: number;
   totalRounds: number;
   totalScore: number;
 }
 
 export default function RoundPrompt({
-  location,
+  prompt,
   roundNumber,
   totalRounds,
   totalScore,
 }: RoundPromptProps) {
+  // PromptView leaves subtype and difficulty optional (practice builds prompts
+  // from a different source), so the tag row renders only what actually
+  // arrived rather than printing "undefined" into a pill.
+  const tags = [
+    prompt.subtype ? { className: `tag tag--${prompt.category}`, text: SUBTYPE_LABELS[prompt.subtype] } : null,
+    prompt.difficulty
+      ? { className: `tag tag--${prompt.difficulty}`, text: DIFFICULTY_LABELS[prompt.difficulty] }
+      : null,
+  ].filter((tag): tag is { className: string; text: string } => tag !== null);
+
   return (
     <header className="hud">
       <div className="hud__chip">
         Round {roundNumber} / {totalRounds}
       </div>
 
-      <div className="hud__prompt" key={location.id}>
+      {/* Keyed so React remounts the block each round and the CSS entry
+          animation replays; the round key is per-day opaque, so it is a safe
+          identity to expose. */}
+      <div className="hud__prompt" key={prompt.key}>
         <span className="hud__label">Tap as close as you can to</span>
         <h1 className="hud__place">
-          {location.name}
-          {location.municipio && <span className="hud__municipio">{location.municipio}</span>}
+          {prompt.name}
+          {prompt.municipio && <span className="hud__municipio">{prompt.municipio}</span>}
         </h1>
-        <div className="hud__tags">
-          <span className={`tag tag--${location.category}`}>
-            {SUBTYPE_LABELS[location.subtype]}
-          </span>
-          <span className={`tag tag--${location.difficulty}`}>
-            {DIFFICULTY_LABELS[location.difficulty]}
-          </span>
-        </div>
+        {tags.length > 0 && (
+          <div className="hud__tags">
+            {tags.map((tag) => (
+              <span key={tag.text} className={tag.className}>
+                {tag.text}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="hud__chip hud__chip--score">

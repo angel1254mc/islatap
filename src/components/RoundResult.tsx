@@ -1,4 +1,4 @@
-import type { RoundOutcome } from '../lib/game';
+import type { PlayedRound } from '../lib/round-state';
 import { formatDistance } from '../lib/scoring';
 
 function verdictFor(points: number): string {
@@ -10,7 +10,7 @@ function verdictFor(points: number): string {
 }
 
 interface RoundResultProps {
-  outcome: RoundOutcome;
+  outcome: PlayedRound;
   isLastRound: boolean;
   onNext: () => void;
 }
