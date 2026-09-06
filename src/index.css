@@ -679,3 +679,43 @@ th.results__points-col {
   font-size: 14px;
   color: var(--ink-dim);
 }
+
+/* --------------------------- Sound toggle --------------------------- */
+
+/* Stacked directly above Leaflet's bottom-left zoom control (26px per button
+   plus its own 10px margin), so the two read as one column of map controls.
+   z-index matches the HUD's layer: above the map panes, below the full-screen
+   start and results screens, which deliberately cover it. */
+.sound-toggle {
+  position: absolute;
+  left: 10px;
+  bottom: 78px;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.sound-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+/* Muted is the off state, so it recedes rather than lighting up: aria-pressed
+   carries the meaning, and this only has to look quieter than unmuted. */
+.sound-toggle[aria-pressed='true'] {
+  color: var(--ink-dim);
+}
+
+.sound-toggle:focus-visible {
+  outline: 2px solid var(--sun);
+  outline-offset: 2px;
+}

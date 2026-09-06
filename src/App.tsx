@@ -5,6 +5,7 @@ import Results from './components/Results';
 import RoundPrompt from './components/RoundPrompt';
 import RoundResult from './components/RoundResult';
 import StartScreen from './components/StartScreen';
+import SoundToggle from './components/SoundToggle';
 import StatusScreen from './components/StatusScreen';
 import { fetchDaily, submitGuess, userMessage, warmGuess } from './lib/api';
 import {
@@ -18,6 +19,7 @@ import {
   type DayEntry,
   type GameHistory,
 } from './lib/history';
+import { useTapSound } from './hooks/useTapSound';
 import { loadPracticeGame, scorePracticeGuess } from './lib/practice';
 import { INITIAL_GAME_STATE, gameReducer, totalScoreOf } from './lib/round-state';
 import { MIN_PING_MS, notBefore } from './lib/pacing';
@@ -228,9 +230,21 @@ export default function App() {
     dispatch({ type: 'practice/load-start' });
   }, []);
 
-  const handleGuess = useCallback((guess: LatLng) => {
-    dispatch({ type: 'guess/start', guess });
-  }, []);
+  // Held at App level, not in MapView: the toggle renders outside the map and
+  // has to read the same mute the tap handler writes.
+  const { playTapSounds, muted, toggleMuted } = useTapSound();
+
+  const handleGuess = useCallback(
+    (guess: LatLng) => {
+      // Fired here rather than inside MapView's click handler because this is
+      // the one funnel both modes' taps pass through, and because the sounds
+      // belong to a committed guess: MapView only calls onGuess when the map is
+      // armed, so a tap during 'submitting' or a reveal stays silent.
+      playTapSounds();
+      dispatch({ type: 'guess/start', guess });
+    },
+    [playTapSounds],
+  );
 
   const handleRetryGuess = useCallback(() => {
     dispatch({ type: 'guess/retry' });
@@ -267,6 +281,8 @@ export default function App() {
         inside={revealed && lastOutcome ? lastOutcome.inside : false}
         onGuess={handleGuess}
       />
+
+      <SoundToggle muted={muted} onToggle={toggleMuted} />
 
       {promptVisible && currentPrompt && (
         <RoundPrompt
