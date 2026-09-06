@@ -1,4 +1,5 @@
 import type { StorageLike } from './history';
+import { DEFAULT_VOLUME } from './sound';
 
 /**
  * Whether the player has muted the tap sounds.
@@ -29,5 +30,41 @@ export function saveMuted(storage: StorageLike, muted: boolean): void {
     storage.setItem(MUTED_KEY, String(muted));
   } catch {
     // Preference is a nicety; a full or locked-down quota must not break a tap.
+  }
+}
+
+/** How loud the tap sounds play, 0..1. Versioned for the same reason. */
+export const VOLUME_KEY = 'islatap:volume:v1';
+
+/**
+ * Read the volume, defaulting to the midpoint.
+ *
+ * Clamped and NaN-guarded here as well as in volumeScale(). Belt and braces on
+ * purpose: this value is read straight out of a store the player can edit by
+ * hand, and the two failure modes — a gain of 40 and a gain of NaN, which
+ * silently kills every note downstream of it — are both worse than ignoring a
+ * corrupt entry.
+ */
+export function loadVolume(storage: StorageLike): number {
+  let raw: string | null;
+  try {
+    raw = storage.getItem(VOLUME_KEY);
+  } catch {
+    return DEFAULT_VOLUME;
+  }
+  if (raw === null) return DEFAULT_VOLUME;
+
+  // Number() rather than parseFloat(): parseFloat('0.5rem') is 0.5, and a value
+  // that arrived malformed should fall back, not be half-believed.
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return DEFAULT_VOLUME;
+  return Math.min(1, Math.max(0, parsed));
+}
+
+export function saveVolume(storage: StorageLike, volume: number): void {
+  try {
+    storage.setItem(VOLUME_KEY, String(volume));
+  } catch {
+    // As above: a preference is never worth a crash.
   }
 }
