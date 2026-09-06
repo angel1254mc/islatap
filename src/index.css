@@ -680,19 +680,26 @@ th.results__points-col {
   color: var(--ink-dim);
 }
 
-/* --------------------------- Sound toggle --------------------------- */
+/* --------------------------- Sound control --------------------------- */
 
 /* Stacked directly above Leaflet's bottom-left zoom control (26px per button
    plus its own 10px margin), so the two read as one column of map controls.
    z-index matches the HUD's layer: above the map panes, below the full-screen
    start and results screens, which deliberately cover it. */
-.sound-toggle {
+.sound-control {
   position: absolute;
   left: 10px;
   bottom: 78px;
   z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.sound-control__button {
   display: grid;
   place-items: center;
+  flex: none;
   width: 34px;
   height: 34px;
   padding: 0;
@@ -705,17 +712,106 @@ th.results__points-col {
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 
-.sound-toggle:hover {
+.sound-control__button:hover {
   border-color: rgba(255, 255, 255, 0.32);
 }
 
 /* Muted is the off state, so it recedes rather than lighting up: aria-pressed
    carries the meaning, and this only has to look quieter than unmuted. */
-.sound-toggle[aria-pressed='true'] {
+.sound-control__button[aria-pressed='true'] {
   color: var(--ink-dim);
 }
 
-.sound-toggle:focus-visible {
+.sound-control__button:focus-visible {
   outline: 2px solid var(--sun);
   outline-offset: 2px;
+}
+
+/* Collapsed to nothing until wanted. Width and opacity animate rather than
+   `display`, which cannot transition; padding and margin go to zero too, or the
+   collapsed track still occupies 20-odd pixels next to the speaker. */
+.sound-control__slider {
+  width: 0;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  appearance: none;
+  height: 34px;
+  background: none;
+  cursor: pointer;
+  transition: width 0.18s ease, opacity 0.18s ease, margin 0.18s ease;
+}
+
+/* :focus-within is the keyboard half — tabbing to the slider opens it, which is
+   the only way it is reachable without a pointer. */
+.sound-control:hover .sound-control__slider,
+.sound-control:focus-within .sound-control__slider {
+  width: 96px;
+  margin-left: 10px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* A disabled slider is still exposed to the reveal, so muting mid-hover does
+   not make the control jump width; it just stops responding. */
+.sound-control__slider:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.sound-control__slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.sound-control__slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.sound-control__slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border: none;
+  border-radius: 50%;
+  background: var(--coral);
+}
+
+.sound-control__slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--coral);
+}
+
+.sound-control__slider:focus-visible {
+  outline: 2px solid var(--sun);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Touch has no hover: the slider would be reachable only by tabbing to it,
+   which is not a gesture a phone offers. Show it permanently there instead —
+   no JS, no long-press affordance to teach. */
+@media (hover: none) {
+  .sound-control__slider {
+    width: 96px;
+    margin-left: 10px;
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Matches the sonar rings' treatment above: the control still opens, it just
+   stops sliding open. */
+@media (prefers-reduced-motion: reduce) {
+  .sound-control__slider {
+    transition: none;
+  }
 }

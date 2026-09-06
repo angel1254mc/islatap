@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { scheduleTap } from '../lib/sound';
-import { loadMuted, saveMuted } from '../lib/sound-prefs';
+import { DEFAULT_VOLUME, scheduleDing, scheduleTap } from '../lib/sound';
+import { loadMuted, loadVolume, saveMuted, saveVolume } from '../lib/sound-prefs';
 
 /**
  * Owns the AudioContext behind the tap sounds, and ties its life to the
@@ -52,15 +52,40 @@ function writeMuted(muted: boolean): void {
   }
 }
 
+function readVolume(): number {
+  try {
+    return loadVolume(window.localStorage);
+  } catch {
+    return DEFAULT_VOLUME;
+  }
+}
+
+function writeVolume(volume: number): void {
+  try {
+    saveVolume(window.localStorage, volume);
+  } catch {
+    // As above.
+  }
+}
+
 export interface TapSound {
   /** Ding now, sonar ping 300ms behind it. A no-op while muted. */
   playTapSounds: () => void;
   muted: boolean;
   toggleMuted: () => void;
+  /** 0..1, the slider's position rather than a gain — see volumeScale. */
+  volume: number;
+  setVolume: (volume: number) => void;
+  /**
+   * Just the ding, at the current volume. The slider needs this: without it the
+   * only way to audition a change is to spend a real guess.
+   */
+  previewVolume: () => void;
 }
 
 export function useTapSound(): TapSound {
   const [muted, setMuted] = useState(readMuted);
+  const [volume, setVolumeState] = useState(readVolume);
   const contextRef = useRef<AudioContext | null>(null);
 
   useEffect(
@@ -71,13 +96,17 @@ export function useTapSound(): TapSound {
     [],
   );
 
-  const playTapSounds = useCallback(() => {
-    if (muted) return;
-
+  /**
+   * Get the context, creating it on first use, or null if this browser cannot.
+   *
+   * Only ever called from inside a click or key handler, which is what keeps
+   * the lazy construction legal — see the note on the constructor below.
+   */
+  const openContext = useCallback((): AudioContext | null => {
     let context = contextRef.current;
     if (!context) {
       const Ctor = audioContextCtor();
-      if (!Ctor) return;
+      if (!Ctor) return null;
       try {
         // Constructed inside the tap handler on purpose. A context created
         // before any user gesture starts life 'suspended' and stays mute until
@@ -85,7 +114,7 @@ export function useTapSound(): TapSound {
         // gesture that unlocks it.
         context = new Ctor();
       } catch {
-        return;
+        return null;
       }
       contextRef.current = context;
     }
@@ -94,8 +123,32 @@ export function useTapSound(): TapSound {
     // iOS reclaiming audio for another app — and resume() is the way back.
     if (context.state === 'suspended') void context.resume();
 
-    scheduleTap(context, context.currentTime);
-  }, [muted]);
+    return context;
+  }, []);
+
+  const playTapSounds = useCallback(() => {
+    if (muted) return;
+    const context = openContext();
+    if (!context) return;
+    scheduleTap(context, context.currentTime, volume);
+  }, [muted, volume, openContext]);
+
+  /**
+   * The ding alone, not the whole tap: a preview that replayed both notes would
+   * take 850ms and overlap the next drag, and the ding is the louder of the two
+   * anyway, so it is the one worth judging the level by.
+   */
+  const previewVolume = useCallback(() => {
+    if (muted) return;
+    const context = openContext();
+    if (!context) return;
+    scheduleDing(context, context.currentTime, volume);
+  }, [muted, volume, openContext]);
+
+  const setVolume = useCallback((next: number) => {
+    setVolumeState(next);
+    writeVolume(next);
+  }, []);
 
   const toggleMuted = useCallback(() => {
     setMuted((previous) => {
@@ -105,5 +158,5 @@ export function useTapSound(): TapSound {
     });
   }, []);
 
-  return { playTapSounds, muted, toggleMuted };
+  return { playTapSounds, muted, toggleMuted, volume, setVolume, previewVolume };
 }

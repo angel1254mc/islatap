@@ -232,7 +232,7 @@ export default function App() {
 
   // Held at App level, not in MapView: the toggle renders outside the map and
   // has to read the same mute the tap handler writes.
-  const { playTapSounds, muted, toggleMuted } = useTapSound();
+  const { playTapSounds, muted, toggleMuted, volume, setVolume, previewVolume } = useTapSound();
 
   const handleGuess = useCallback(
     (guess: LatLng) => {
@@ -282,7 +282,13 @@ export default function App() {
         onGuess={handleGuess}
       />
 
-      <SoundToggle muted={muted} onToggle={toggleMuted} />
+      <SoundToggle
+        muted={muted}
+        onToggle={toggleMuted}
+        volume={volume}
+        onVolumeChange={setVolume}
+        onPreview={previewVolume}
+      />
 
       {promptVisible && currentPrompt && (
         <RoundPrompt
