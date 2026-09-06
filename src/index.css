@@ -754,10 +754,24 @@ th.results__points-col {
 }
 
 /* A disabled slider is still exposed to the reveal, so muting mid-hover does
-   not make the control jump width; it just stops responding. */
+   not make the control jump width; it just stops responding.
+
+   Deliberately NOT dimmed with opacity. `opacity` on this element means one
+   thing only — whether the control is revealed — and a second rule claiming it
+   for "muted" outranks the collapsed `opacity: 0` above (0,2,0 beats 0,1,0),
+   which pinned the collapsed slider at 45% for as long as the sound was off and
+   left the coral thumb floating over the map. Being muted is shown by draining
+   the thumb's color instead, which no other rule touches. */
 .sound-control__slider:disabled {
   cursor: default;
-  opacity: 0.45;
+}
+
+.sound-control__slider:disabled::-webkit-slider-thumb {
+  background: var(--ink-dim);
+}
+
+.sound-control__slider:disabled::-moz-range-thumb {
+  background: var(--ink-dim);
 }
 
 .sound-control__slider::-webkit-slider-runnable-track {
