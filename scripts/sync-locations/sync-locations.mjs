@@ -346,8 +346,8 @@ async function main() {
   console.log(`In sync: ${after.length} locations match this checkout.`);
 }
 
-// Importing this module must never open a connection: sync-locations.test.mjs
-// exercises the pure functions above with no database in sight.
+// Importing this module must never open a connection — everything above is
+// pure, and only main() below talks to a database.
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   try {
     await main();
