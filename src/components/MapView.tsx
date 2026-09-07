@@ -1,8 +1,7 @@
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import L from 'leaflet';
 import {
   Circle,
-  CircleMarker,
   MapContainer,
   Marker,
   Polygon,
@@ -21,7 +20,7 @@ import {
   type MultiPolygon,
   type LatLng,
 } from '../lib/scoring';
-import { getShapesByLayer, startShapeLoad, type ShapeLayer } from '../lib/shapes';
+import DebugOverlays from './DebugOverlays';
 
 /**
  * Everything the reveal needs to know about the answer. Deliberately not
@@ -48,155 +47,6 @@ const INITIAL_CENTER: L.LatLngTuple = [18.22, -66.35];
 const INITIAL_ZOOM = 9;
 const MIN_ZOOM = 9;
 const MAX_ZOOM = 16;
-
-// Boundary QA overlay: ?debug=shapes renders every municipio outline at once so
-// edge alignment between neighbors can be eyeballed against the imagery;
-// &layer=barrio|comunidad|subbarrio|all switches the Census layer. Read once at
-// module load — it's a URL-only debug tool with no game-state interaction.
-const DEBUG_QUERY = new URLSearchParams(window.location.search);
-const DEBUG_SHAPES = DEBUG_QUERY.get('debug') === 'shapes';
-const DEBUG_LAYERS: readonly ShapeLayer[] = ['municipio', 'barrio', 'comunidad', 'subbarrio', 'all'];
-const DEBUG_LAYER: ShapeLayer = (DEBUG_LAYERS as readonly string[]).includes(
-  DEBUG_QUERY.get('layer') ?? '',
-)
-  ? (DEBUG_QUERY.get('layer') as ShapeLayer)
-  : 'municipio';
-
-// Landmark QA overlay: ?debug=landmarks draws every curated landmark with its
-// acceptance circle and its independently sourced reference point, so an
-// answer sitting off its own landmark is visible against the imagery rather
-// than inferred from a number.
-//
-// This is the sibling ?debug=shapes never had. Boundary rows could always be
-// eyeballed; the 26 rows that score by radius could not, and six of them were
-// wrong for months -- one of them 250 m out over the Atlantic -- because
-// nothing in the app ever drew them.
-const DEBUG_LANDMARKS = DEBUG_QUERY.get('debug') === 'landmarks';
-
-function DebugShapesOverlay() {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    void startShapeLoad().then(() => {
-      if (mounted) setReady(true);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  if (!ready) return null;
-  return (
-    <>
-      {getShapesByLayer(DEBUG_LAYER).map(([geoid, shape]) =>
-        shape.map((part, index) => (
-          <Polygon
-            key={`${geoid}-${index}`}
-            positions={part}
-            interactive={false}
-            pathOptions={{ color: '#38bdf8', weight: 1, fillColor: '#38bdf8', fillOpacity: 0.04 }}
-          />
-        )),
-      )}
-    </>
-  );
-}
-
-interface DebugLandmark {
-  id: number;
-  name: string;
-  lat: number;
-  lng: number;
-  radiusKm: number | null;
-  ref: { lat: number; lng: number; source: string } | null;
-  km: number | null;
-}
-
-function DebugLandmarksOverlay() {
-  const [rows, setRows] = useState<DebugLandmark[]>([]);
-
-  useEffect(() => {
-    let mounted = true;
-    // Dynamic, for the same reason loadPracticeGame() is: a static edge from
-    // MapView into curated.ts would pull the whole location table into the
-    // first-load bundle for every daily player, undoing the chunk split.
-    void import('../data/curated').then(({ CURATED_LOCATIONS }) => {
-      if (!mounted) return;
-      setRows(
-        CURATED_LOCATIONS.filter((l) => l.category === 'landmark').map((l) => ({
-          id: l.id,
-          name: l.name,
-          lat: l.lat,
-          lng: l.lng,
-          radiusKm: l.radiusKm ?? null,
-          ref: l.ref ?? null,
-          km: l.ref ? haversineKm(l, l.ref) : null,
-        })),
-      );
-    });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return (
-    <>
-      {rows.map((row) => {
-        // Red is the whole point of the overlay: the acceptance circle does
-        // not reach the real landmark, so the round cannot be won by tapping
-        // the right place. Amber is a healthy circle.
-        const broken = row.km != null && row.radiusKm != null && row.km > row.radiusKm;
-        const color = broken ? '#ef4444' : '#f59e0b';
-        const label =
-          `${row.name}` +
-          (row.radiusKm != null ? ` — r ${row.radiusKm} km` : ' — scored by shape') +
-          (row.km != null ? `, ref ${row.km.toFixed(3)} km (${row.ref?.source})` : '');
-
-        return (
-          <Fragment key={row.id}>
-            {row.radiusKm != null && (
-              <Circle
-                center={[row.lat, row.lng]}
-                radius={row.radiusKm * 1000}
-                interactive={false}
-                pathOptions={{ color, weight: 1.5, fillColor: color, fillOpacity: 0.12 }}
-              />
-            )}
-            {/* Reference and answer joined by a line, so a drift reads as a
-                visible offset even when both dots overlap at low zoom. */}
-            {row.ref && (
-              <Polyline
-                positions={[
-                  [row.lat, row.lng],
-                  [row.ref.lat, row.ref.lng],
-                ]}
-                interactive={false}
-                pathOptions={{ color: '#ffffff', weight: 1, opacity: 0.7 }}
-              />
-            )}
-            {row.ref && (
-              <CircleMarker
-                center={[row.ref.lat, row.ref.lng]}
-                radius={4}
-                pathOptions={{ color: '#22c55e', weight: 2, fillColor: '#22c55e', fillOpacity: 1 }}
-              >
-                <Tooltip>{`reference: ${row.ref.source}`}</Tooltip>
-              </CircleMarker>
-            )}
-            <CircleMarker
-              center={[row.lat, row.lng]}
-              radius={5}
-              pathOptions={{ color: '#ffffff', weight: 2, fillColor: color, fillOpacity: 1 }}
-            >
-              <Tooltip>{label}</Tooltip>
-            </CircleMarker>
-          </Fragment>
-        );
-      })}
-    </>
-  );
-}
 
 // Leaflet's default icon URLs break under bundlers, so pins are explicit
 // divIcons with inline SVG instead.
@@ -358,8 +208,7 @@ export default function MapView({
         <TileLayer url={BASE_LAYER_URL} attribution={BASE_LAYER_ATTRIBUTION} />
         <ZoomControl position="bottomleft" />
         <ClickHandler enabled={interactive} onGuess={onGuess} />
-        {DEBUG_SHAPES && <DebugShapesOverlay />}
-        {DEBUG_LANDMARKS && <DebugLandmarksOverlay />}
+        <DebugOverlays />
         <ViewController
           roundIndex={roundIndex}
           revealed={revealed}
