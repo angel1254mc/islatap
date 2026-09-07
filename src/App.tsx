@@ -236,10 +236,6 @@ export default function App() {
 
   const handleGuess = useCallback(
     (guess: LatLng) => {
-      // Fired here rather than inside MapView's click handler because this is
-      // the one funnel both modes' taps pass through, and because the sounds
-      // belong to a committed guess: MapView only calls onGuess when the map is
-      // armed, so a tap during 'submitting' or a reveal stays silent.
       playTapSounds();
       dispatch({ type: 'guess/start', guess });
     },

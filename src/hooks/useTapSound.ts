@@ -2,23 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_VOLUME, scheduleDing, scheduleTap } from '../lib/sound';
 import { loadMuted, loadVolume, saveMuted, saveVolume } from '../lib/sound-prefs';
 
-/**
- * Owns the AudioContext behind the tap sounds, and ties its life to the
- * component's.
- *
- * A module-level singleton would be simpler and wrong: browsers cap how many
- * AudioContexts a page may hold (Chrome at six), and every one is a live audio
- * thread. Under StrictMode's double-mount and Vite's Fast Refresh, a singleton
- * that is never closed leaks one per reload until the seventh construction
- * throws and the game goes silent for the rest of the dev session. The context
- * lives in a ref here and is closed on unmount.
- *
- * There is no automated test: the repo runs Vitest under `environment: 'node'`,
- * where there is neither React DOM nor Web Audio. The schedulable part is
- * therefore pushed down into src/lib/sound.ts, which is pure and covered; what
- * is left here is lifecycle, and it is verified by ear.
- */
-
 type AudioContextCtor = new () => AudioContext;
 
 /**
@@ -113,7 +96,10 @@ export function useTapSound(): TapSound {
         // one arrives; created here, the tap that wants the sound is itself the
         // gesture that unlocks it.
         context = new Ctor();
-      } catch {
+      } catch (error) {
+        // Not expected: the gesture requirement is already satisfied here. If it
+        // ever does happen the game goes silent, so say why in the console.
+        console.warn('Tap sounds off: the AudioContext failed to open.', error);
         return null;
       }
       contextRef.current = context;
@@ -133,11 +119,7 @@ export function useTapSound(): TapSound {
     scheduleTap(context, context.currentTime, volume);
   }, [muted, volume, openContext]);
 
-  /**
-   * The ding alone, not the whole tap: a preview that replayed both notes would
-   * take 850ms and overlap the next drag, and the ding is the louder of the two
-   * anyway, so it is the one worth judging the level by.
-   */
+  /** Plays the ding. */
   const previewVolume = useCallback(() => {
     if (muted) return;
     const context = openContext();

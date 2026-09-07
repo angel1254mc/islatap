@@ -36,15 +36,7 @@ export function saveMuted(storage: StorageLike, muted: boolean): void {
 /** How loud the tap sounds play, 0..1. Versioned for the same reason. */
 export const VOLUME_KEY = 'islatap:volume:v1';
 
-/**
- * Read the volume, defaulting to the midpoint.
- *
- * Clamped and NaN-guarded here as well as in volumeScale(). Belt and braces on
- * purpose: this value is read straight out of a store the player can edit by
- * hand, and the two failure modes — a gain of 40 and a gain of NaN, which
- * silently kills every note downstream of it — are both worse than ignoring a
- * corrupt entry.
- */
+/** Read the volume, defaulting to the midpoint. */
 export function loadVolume(storage: StorageLike): number {
   let raw: string | null;
   try {
