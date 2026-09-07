@@ -69,7 +69,7 @@ npm run db:sync -- --dry-run                 # uses .env, writes nothing
 npm run db:sync -- --env=.env.production     # diff, confirm, then write
 ```
 
-`sync-locations.mjs` reads the current rows first and prints exactly what will
+`scripts/sync-locations/sync-locations.mjs` reads the current rows first and prints exactly what will
 change before changing it:
 
 ```

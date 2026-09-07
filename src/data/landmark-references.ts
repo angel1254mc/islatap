@@ -19,7 +19,7 @@
 // Every row below was resolved from a named feature in an external gazetteer,
 // never from curated.ts. landmark-coords.test.ts asserts that each landmark's
 // acceptance circle actually contains its reference, which is the property all
-// six defects violated. Regenerate with: node scripts/audit-coords.mjs
+// six defects violated. Regenerate with: node scripts/audit-coords/audit-coords.mjs
 //
 // CHOOSING A SOURCE
 //   gnis:<feature_id>  USGS Geographic Names Information System, the federal

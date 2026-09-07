@@ -1,37 +1,14 @@
 #!/usr/bin/env node
 // Re-verifies curated landmark coordinates against their recorded sources.
 //
-//   node scripts/audit-coords.mjs            local checks only, no network
-//   node scripts/audit-coords.mjs --live     also re-fetch OSM objects by id
-//
-// This is a maintenance tool, not part of the build. The invariant it guards
-// is asserted offline by src/data/landmark-coords.test.ts; what --live adds is
-// detection of drift in the upstream source itself -- an OSM way that has been
-// redrawn, retagged or deleted since the reference was recorded.
-//
-// WHY LOOKUP BY ID, NOT BY NAME
-// -----------------------------
-// The audit that originally found these six defects searched by name, and both
-// obvious ranking strategies produced confident wrong answers:
-//
-//   rank by distance  -- confirms whatever coordinate is already in the file,
-//                        which is precisely how a 4 km error survives review
-//   rank by name      -- "Cabo Rojo" matches the MUNICIPALITY (13.6 km away,
-//                        and the bad point falls inside its polygon, so the
-//                        check reads as a pass); "El Vigía" matches a
-//                        same-named building 75 km away
-//
-// Only a bounding box AND a name filter together resolved the ambiguous cases.
-// Storing the resolved object id in landmark-references.ts retires that whole
-// problem: re-verification is a direct lookup with nothing left to rank.
-//
-// Zero dependencies, matching scripts/build-locations.mjs and scripts/seed.mjs.
+// See ./README.md for what this checks, when to run it, and why it looks
+// objects up by id rather than by name.
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OVERPASS = 'https://overpass-api.de/api/interpreter';
 const UA = 'maptap-audit-coords (https://github.com/angel1254mc/islatap)';
 

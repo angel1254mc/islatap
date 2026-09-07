@@ -2,48 +2,23 @@
 // Syncs a deployed database to the location data in this checkout, showing
 // exactly what will change before it changes it.
 //
-//   node scripts/sync-locations.mjs --dry-run
-//   node scripts/sync-locations.mjs --env=.env.production
-//   node scripts/sync-locations.mjs --database-url='postgresql://...' --yes
-//   node --env-file=.env scripts/sync-locations.mjs
-//
-// WHY THIS EXISTS ALONGSIDE db:seed
-// ---------------------------------
-// `npm run db:seed` is the right tool for standing a database up: it upserts
-// 1088 locations and 1422 shapes and tells you nothing about what moved. That
-// is fine when the answer is "everything, it was empty".
-//
-// It is the wrong tool for touching production, because a location edit is
-// unreviewable after the fact -- an upsert leaves no trace of the old value,
-// and `location` has no updated_at. Six coordinates in this repo were wrong
-// for months precisely because nothing ever compared them to anything. So this
-// script reads the current rows FIRST, diffs them against the files, and makes
-// you look at the list before it writes.
-//
-// The write itself is seed.mjs's, imported rather than reimplemented: one
-// upsert statement in this repo, not two that can drift apart.
-//
-// A deploy does NOT run this. Vercel ships the client bundle -- which fixes
-// practice mode, since it imports src/data/curated.ts directly -- while daily
-// mode keeps reading coordinates from Postgres. Until someone runs this, the
-// two modes disagree.
-//
-// Zero dependencies beyond the Neon driver, matching the rest of scripts/.
+// See ./README.md for when to use this instead of `npm run db:seed`, how
+// DATABASE_URL is resolved, and what the sync deliberately does not do.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { neon } from '@neondatabase/serverless';
-import { assertSeedInvariants, loadSeedData, seedLocations, seedShapes } from './seed.mjs';
+import { assertSeedInvariants, loadSeedData, seedLocations, seedShapes } from '../seed.mjs';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const USAGE = [
   'Sync a deployed database to the location data in this checkout.',
   '',
   'Usage:',
-  '  node scripts/sync-locations.mjs [options]',
+  '  node scripts/sync-locations/sync-locations.mjs [options]',
   '',
   'Options:',
   '  --database-url=<url>  Neon connection string. Highest precedence.',
@@ -58,7 +33,7 @@ const USAGE = [
   '  --database-url  >  --env  >  process.env  >  ./.env',
   '',
   "Node's own --env-file also works and lands in process.env:",
-  '  node --env-file=.env.production scripts/sync-locations.mjs',
+  '  node --env-file=.env.production scripts/sync-locations/sync-locations.mjs',
 ].join('\n');
 
 const SELECT_LOCATIONS =
@@ -146,7 +121,7 @@ export function resolveDatabaseUrl(opts, env = process.env) {
     return { url: parsed.DATABASE_URL, from: opts.envFile };
   }
 
-  // Covers `node --env-file=.env scripts/sync-locations.mjs`, which is how the
+  // Covers `node --env-file=.env scripts/sync-locations/sync-locations.mjs`, which is how the
   // rest of the repo's commands are documented, as well as a plain export.
   if (env.DATABASE_URL) return { url: env.DATABASE_URL, from: 'process.env.DATABASE_URL' };
 
