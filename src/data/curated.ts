@@ -38,8 +38,7 @@
 //   Observatorio de Arecibo has only 16 m of margin against its 0.25 km radius.
 //
 // src/data/landmark-coords.test.ts asserts every acceptance circle still covers
-// its ref; `node scripts/audit-coords/audit-coords.mjs --live` re-checks the OSM
-// ones against upstream.
+// its ref, so editing a coordinate without editing its ref fails the suite.
 import type { GameLocation } from './types';
 
 export const CURATED_LOCATIONS: GameLocation[] = [
