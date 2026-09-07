@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "db:migrate": "node --env-file=.env scripts/migrate.mjs",
-    "db:seed": "node --env-file=.env scripts/seed.mjs"
+    "db:seed": "node --env-file=.env scripts/seed.mjs",
+    "db:sync": "node scripts/sync-locations/sync-locations.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
