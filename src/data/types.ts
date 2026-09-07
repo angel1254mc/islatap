@@ -47,6 +47,15 @@ export interface GameLocation {
   radiusKm?: number;
   lat: number;
   lng: number;
+  /**
+   * Where an independent gazetteer puts this place, on curated landmarks only.
+   *
+   * Never read at runtime and never seeded — the database stores lat/lng, and
+   * this exists so landmark-coords.test.ts can assert that lat/lng still points
+   * at the real thing. `source` is a resolvable id; see the header of
+   * curated.ts for how to look one up.
+   */
+  ref?: { lat: number; lng: number; source: string };
 }
 
 /**

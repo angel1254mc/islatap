@@ -3,13 +3,43 @@
 // municipios (78) — GeoNames PPLA town-seat points. These are the plaza/downtown
 //   seats, deliberately NOT the Census "zona urbana" internal points, which drift to
 //   the geometric middle of the urban blob (8.2 km off for San Juan).
-// landmarks (26)  — curated, individually verified coordinates. The TIGER landmark
-//   layers are unusable here: only 161 of 1120 point landmarks are even named.
+// landmarks (26)  — each carries a `ref`: where an independent gazetteer puts the
+//   same place, so the coordinate can be re-checked instead of trusted. The TIGER
+//   landmark layers are unusable here: only 161 of 1120 point landmarks are named.
 // barrios (16)    — curated centroids for the well-known ones. Six (Río Piedras,
 //   Condado, Miramar, Ocean Park, Puerta de Tierra, Barrio Obrero) use authoritative
 //   2025 Census subbarrio internal points; the rest are approximate by nature.
 //
 // Anything here wins over a TIGER row with the same folded name + municipio.
+//
+// RESOLVING A LANDMARK `ref`
+//   osm:<type>/<id>   https://www.openstreetmap.org/way/142863669 — object pages
+//                     render server-side, so the URL is the citation.
+//   gnis:<feature_id> USGS Geographic Names Information System. There is no
+//                     per-feature URL: the gazetteer web app serves the same
+//                     SPA shell for every route, real id or not. Look the id up
+//                     in column 1 of the bulk file instead —
+//                     https://prd-tnm.s3.amazonaws.com/StagedProducts/GeographicNames/DomesticNames/DomesticNames_PR_Text.zip
+//
+// Use GNIS for natural features and OSM for buildings. Never reach into an
+// administrative layer for a landmark point — that is what produced the two
+// worst coordinates this file has shipped, each one an exact copy of a
+// same-named civil record rather than of the landmark:
+//   Castillo San Cristóbal  was GNIS "San Cristóbal Subbarrio" [Civil], 250 m
+//                           north of the fort and out over the Atlantic
+//   Parque de Bombas        was GNIS "Ponce" [Populated Place], 98 m off against
+//                           an 80 m radius
+//
+// Judgment calls, all currently inside their radius but contestable:
+//   Camuy points at the reserve centroid; Cueva Clara is 690 m east, outside r.
+//   El Vigía is the hill, not the Cruceta monument 259 m south.
+//   Bahía Mosquito is the beach; the bay proper is 553 m north.
+//   La Guancha is the boardwalk, not the same-named community centre 390 m SW.
+//   Observatorio de Arecibo has only 16 m of margin against its 0.25 km radius.
+//
+// src/data/landmark-coords.test.ts asserts every acceptance circle still covers
+// its ref; `node scripts/audit-coords/audit-coords.mjs --live` re-checks the OSM
+// ones against upstream.
 import type { GameLocation } from './types';
 
 export const CURATED_LOCATIONS: GameLocation[] = [
@@ -94,32 +124,32 @@ export const CURATED_LOCATIONS: GameLocation[] = [
   // Landmark radiusKm ≈ the feature's real footprint: guesses inside the circle
   // are perfect, so a beach is forgiving along its whole strand while a
   // lighthouse stays precise. Islands use a radius spanning most of the island.
-  { id: 79, name: 'Castillo San Felipe del Morro', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'easy', source: 'curated', radiusKm: 0.15, lat: 18.4708, lng: -66.12399 },
-  { id: 80, name: 'Castillo San Cristóbal', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.15, lat: 18.46728, lng: -66.11081 },
-  { id: 81, name: 'La Fortaleza', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.1, lat: 18.46428, lng: -66.11936 },
-  { id: 82, name: 'Observatorio de Arecibo', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'easy', source: 'curated', radiusKm: 0.25, lat: 18.34417, lng: -66.75278 },
-  { id: 83, name: 'El Yunque', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'easy', source: 'curated', radiusKm: 2, lat: 18.31051, lng: -65.79127 },
-  { id: 84, name: 'Cerro de Punta', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.3, lat: 18.17246, lng: -66.59184 },
-  { id: 85, name: 'Isla de Mona', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', geoid: '72097-isla-de-mona', lat: 18.08134, lng: -67.8913 },
-  { id: 86, name: 'Isla de Culebra', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'easy', source: 'curated', geoid: '72049-isla-de-culebra', lat: 18.31468, lng: -65.28294 },
-  { id: 87, name: 'Isla de Vieques', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'easy', source: 'curated', geoid: '72147-isla-de-vieques', lat: 18.12805, lng: -65.43351 },
-  { id: 88, name: 'Isla Caja de Muertos', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', geoid: '72113-isla-caja-de-muertos', lat: 17.89469, lng: -66.51989 },
-  { id: 89, name: 'Isla Desecheo', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', geoid: '72097-isla-desecheo', lat: 18.38457, lng: -67.48062 },
-  { id: 90, name: 'Cabo Rojo (Faro Los Morrillos)', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.12, lat: 17.93365, lng: -67.19219 },
-  { id: 91, name: 'Playa Flamenco', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'easy', source: 'curated', radiusKm: 0.5, lat: 18.32801, lng: -65.31627 },
-  { id: 92, name: 'Balneario de Luquillo', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.4, lat: 18.38495, lng: -65.73016 },
-  { id: 93, name: 'Playa Sun Bay', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', radiusKm: 0.5, lat: 18.09691, lng: -65.46044 },
-  { id: 94, name: 'Playa Boquerón', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.6, lat: 18.01024, lng: -67.17546 },
-  { id: 95, name: 'Bahía Mosquito (Bio Bay)', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.5, lat: 18.0975, lng: -65.4433 },
-  { id: 96, name: 'Parque de las Cavernas del Río Camuy', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.3, lat: 18.34399, lng: -66.82619 },
-  { id: 97, name: 'Cueva Ventana', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.3, lat: 18.37122, lng: -66.69156 },
-  { id: 98, name: 'Destilería Bacardí', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.2, lat: 18.4576, lng: -66.1416 },
-  { id: 99, name: 'Aeropuerto Luis Muñoz Marín', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 1, lat: 18.4394, lng: -66.0018 },
-  { id: 100, name: 'Parque de Bombas de Ponce', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.08, lat: 18.01191, lng: -66.61374 },
-  { id: 101, name: 'La Guancha (Ponce)', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', radiusKm: 0.2, lat: 17.96543, lng: -66.61495 },
-  { id: 102, name: 'El Vigía (Ponce)', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', radiusKm: 0.15, lat: 18.02135, lng: -66.62017 },
-  { id: 103, name: 'Monte Guilarte', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', radiusKm: 0.3, lat: 18.14163, lng: -66.76906 },
-  { id: 104, name: 'Faro de Punta Tuna', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', radiusKm: 0.12, lat: 17.98772, lng: -65.88476 },
+  { id: 79, name: 'Castillo San Felipe del Morro', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'easy', source: 'curated', radiusKm: 0.15, lat: 18.4708, lng: -66.12399, ref: { lat: 18.47087, lng: -66.124317, source: 'osm:way/561634537' } },
+  { id: 80, name: 'Castillo San Cristóbal', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.15, lat: 18.46728, lng: -66.11081, ref: { lat: 18.46728, lng: -66.110809, source: 'osm:way/142863669' } },
+  { id: 81, name: 'La Fortaleza', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.1, lat: 18.46428, lng: -66.11936, ref: { lat: 18.464182, lng: -66.119254, source: 'osm:relation/3501975' } },
+  { id: 82, name: 'Observatorio de Arecibo', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'easy', source: 'curated', radiusKm: 0.25, lat: 18.34417, lng: -66.75278, ref: { lat: 18.34623, lng: -66.752309, source: 'osm:node/1024483397' } },
+  { id: 83, name: 'El Yunque', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'easy', source: 'curated', radiusKm: 2, lat: 18.31051, lng: -65.79127, ref: { lat: 18.3105057, lng: -65.7912759, source: 'gnis:1611657' } },
+  { id: 84, name: 'Cerro de Punta', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.3, lat: 18.17246, lng: -66.59184, ref: { lat: 18.172281, lng: -66.5916862, source: 'gnis:1609905' } },
+  { id: 85, name: 'Isla de Mona', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', geoid: '72097-isla-de-mona', lat: 18.08134, lng: -67.8913, ref: { lat: 18.081345, lng: -67.8912971, source: 'gnis:1611188' } },
+  { id: 86, name: 'Isla de Culebra', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'easy', source: 'curated', geoid: '72049-isla-de-culebra', lat: 18.31468, lng: -65.28294, ref: { lat: 18.3146783, lng: -65.2829352, source: 'gnis:1611182' } },
+  { id: 87, name: 'Isla de Vieques', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'easy', source: 'curated', geoid: '72147-isla-de-vieques', lat: 18.12805, lng: -65.43351, ref: { lat: 18.1230192, lng: -65.4162695, source: 'gnis:1612910' } },
+  { id: 88, name: 'Isla Caja de Muertos', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', geoid: '72113-isla-caja-de-muertos', lat: 17.89469, lng: -66.51989, ref: { lat: 17.8946917, lng: -66.5198926, source: 'gnis:1611179' } },
+  { id: 89, name: 'Isla Desecheo', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', geoid: '72097-isla-desecheo', lat: 18.38457, lng: -67.48062, ref: { lat: 18.3840427, lng: -67.4807507, source: 'gnis:2575416' } },
+  { id: 90, name: 'Cabo Rojo (Faro Los Morrillos)', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.12, lat: 17.93365, lng: -67.19219, ref: { lat: 17.933653, lng: -67.192189, source: 'osm:way/206528023' } },
+  { id: 91, name: 'Playa Flamenco', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'easy', source: 'curated', radiusKm: 0.5, lat: 18.32801, lng: -65.31627, ref: { lat: 18.3280112, lng: -65.3162695, source: 'gnis:1611706' } },
+  { id: 92, name: 'Balneario de Luquillo', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.4, lat: 18.38495, lng: -65.73016, ref: { lat: 18.38495, lng: -65.7301626, source: 'gnis:1609601' } },
+  { id: 93, name: 'Playa Sun Bay', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', radiusKm: 0.5, lat: 18.09691, lng: -65.46044, ref: { lat: 18.096909, lng: -65.4604365, source: 'gnis:1992553' } },
+  { id: 94, name: 'Playa Boquerón', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.6, lat: 18.01024, lng: -67.17546, ref: { lat: 18.0102408, lng: -67.1754569, source: 'gnis:1991868' } },
+  { id: 95, name: 'Bahía Mosquito (Bio Bay)', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.5, lat: 18.0975, lng: -65.4433, ref: { lat: 18.0980202, lng: -65.4412696, source: 'gnis:1992548' } },
+  { id: 96, name: 'Parque de las Cavernas del Río Camuy', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.3, lat: 18.34399, lng: -66.82619, ref: { lat: 18.343992, lng: -66.826188, source: 'osm:way/268778721' } },
+  { id: 97, name: 'Cueva Ventana', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.3, lat: 18.37122, lng: -66.69156, ref: { lat: 18.3712185, lng: -66.6915575, source: 'osm:node/4185357807' } },
+  { id: 98, name: 'Destilería Bacardí', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.2, lat: 18.4576, lng: -66.1416, ref: { lat: 18.457888, lng: -66.14068, source: 'osm:way/60252378' } },
+  { id: 99, name: 'Aeropuerto Luis Muñoz Marín', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 1, lat: 18.4394, lng: -66.0018, ref: { lat: 18.4431995, lng: -65.9974304, source: 'osm:relation/6004891' } },
+  { id: 100, name: 'Parque de Bombas de Ponce', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.08, lat: 18.01191, lng: -66.61374, ref: { lat: 18.011908, lng: -66.613742, source: 'osm:way/88319416' } },
+  { id: 101, name: 'La Guancha (Ponce)', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', radiusKm: 0.2, lat: 17.96543, lng: -66.61495, ref: { lat: 17.96543, lng: -66.614949, source: 'osm:way/317002115' } },
+  { id: 102, name: 'El Vigía (Ponce)', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', radiusKm: 0.15, lat: 18.02135, lng: -66.62017, ref: { lat: 18.0213715, lng: -66.6200457, source: 'gnis:1990933' } },
+  { id: 103, name: 'Monte Guilarte', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', radiusKm: 0.3, lat: 18.14163, lng: -66.76906, ref: { lat: 18.141562, lng: -66.7689796, source: 'gnis:1611536' } },
+  { id: 104, name: 'Faro de Punta Tuna', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'hard', source: 'curated', radiusKm: 0.12, lat: 17.98772, lng: -65.88476, ref: { lat: 17.9883007, lng: -65.8848843, source: 'gnis:1611868' } },
   { id: 105, name: 'Viejo San Juan', municipio: 'San Juan', category: 'barrio', subtype: 'barrio', difficulty: 'easy', source: 'curated', geoid: '7212776812', lat: 18.4655, lng: -66.1163 },
   { id: 106, name: 'Santurce', municipio: 'San Juan', category: 'barrio', subtype: 'barrio', difficulty: 'medium', source: 'curated', geoid: '7212779693', lat: 18.4496, lng: -66.0755 },
   { id: 107, name: 'Río Piedras', municipio: 'San Juan', category: 'barrio', subtype: 'barrio', difficulty: 'medium', source: 'curated', geoid: '721276472971576', lat: 18.39982, lng: -66.04994 },

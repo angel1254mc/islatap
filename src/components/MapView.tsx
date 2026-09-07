@@ -121,25 +121,18 @@ function DebugLandmarksOverlay() {
     // Dynamic, for the same reason loadPracticeGame() is: a static edge from
     // MapView into curated.ts would pull the whole location table into the
     // first-load bundle for every daily player, undoing the chunk split.
-    void Promise.all([
-      import('../data/curated'),
-      import('../data/landmark-references'),
-    ]).then(([{ CURATED_LOCATIONS }, { LANDMARK_REFERENCES }]) => {
+    void import('../data/curated').then(({ CURATED_LOCATIONS }) => {
       if (!mounted) return;
-      const byId = new Map(LANDMARK_REFERENCES.map((r) => [r.id, r]));
       setRows(
-        CURATED_LOCATIONS.filter((l) => l.category === 'landmark').map((l) => {
-          const ref = byId.get(l.id);
-          return {
-            id: l.id,
-            name: l.name,
-            lat: l.lat,
-            lng: l.lng,
-            radiusKm: l.radiusKm ?? null,
-            ref: ref ? { lat: ref.lat, lng: ref.lng, source: ref.source } : null,
-            km: ref ? haversineKm(l, ref) : null,
-          };
-        }),
+        CURATED_LOCATIONS.filter((l) => l.category === 'landmark').map((l) => ({
+          id: l.id,
+          name: l.name,
+          lat: l.lat,
+          lng: l.lng,
+          radiusKm: l.radiusKm ?? null,
+          ref: l.ref ?? null,
+          km: l.ref ? haversineKm(l, l.ref) : null,
+        })),
       );
     });
     return () => {

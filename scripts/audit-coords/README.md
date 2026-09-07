@@ -1,7 +1,7 @@
 # audit-coords
 
 Re-verifies the coordinates in `src/data/curated.ts` against the independent
-sources recorded in `src/data/landmark-references.ts`.
+source recorded in each landmark's own `ref` field.
 
 ```bash
 node scripts/audit-coords/audit-coords.mjs          # local checks only, no network
@@ -13,9 +13,9 @@ build.
 
 ## What it checks
 
-Every curated landmark must have a reference, every reference must belong to a
-landmark that still exists, and the names must still agree — a rename that
-swaps two rows would otherwise silently repoint a reference at the wrong place.
+Every curated landmark must carry a `ref`, and every `ref` must cite a
+resolvable id — `gnis:<feature_id>` or `osm:<type>/<id>`. Free-text provenance
+is how "individually verified" came to mean nothing the first time round.
 
 The real assertion is the last one: **a landmark's acceptance circle must
 actually contain the real landmark.** A row with `radiusKm` is checked against
@@ -52,9 +52,8 @@ obvious ways to rank the candidates produced confident wrong answers:
 | By name | `Cabo Rojo` matches the **municipality**, 13.6 km from the lighthouse — and the bad point falls *inside* its polygon, so even a containment check reads as a pass. `El Vigía` matches a same-named building 75 km away. |
 
 Only a bounding box **and** a name filter together resolved the ambiguous
-cases. Recording the resolved object id in `landmark-references.ts` retires the
-problem entirely: re-verification becomes a direct lookup with nothing left to
-rank.
+cases. Recording the resolved object id on the row itself retires the problem
+entirely: re-verification becomes a direct lookup with nothing left to rank.
 
 ## Two implementation notes
 
@@ -71,7 +70,8 @@ size the tolerance with.)
 
 ## Related
 
-- `src/data/landmark-references.ts` — the reference coordinates and their
-  provenance, plus guidance on which source to trust for which kind of feature.
+- `src/data/curated.ts` — the data, each landmark carrying its own `ref`. Its
+  header covers how to resolve a source id and which source to trust for which
+  kind of feature.
 - `src/data/landmark-coords.test.ts` — the same invariant, offline, in
   `npm test`.

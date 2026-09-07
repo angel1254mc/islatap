@@ -96,9 +96,9 @@ async function main() {
   const live = process.argv.includes('--live');
 
   const curated = load('src/data/curated.ts', 'CURATED_LOCATIONS', 'GameLocation');
-  const references = load('src/data/landmark-references.ts', 'LANDMARK_REFERENCES', 'LandmarkReference');
   const landmarks = curated.filter((l) => l.category === 'landmark');
-  const byId = new Map(references.map((r) => [r.id, r]));
+  const references = landmarks.filter((l) => l.ref).map((l) => ({ id: l.id, name: l.name, ...l.ref }));
+  const byId = new Map(landmarks.filter((l) => l.ref).map((l) => [l.id, l.ref]));
 
   let failures = 0;
   console.log(`Auditing ${landmarks.length} curated landmarks against ${references.length} references.\n`);
