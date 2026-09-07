@@ -174,7 +174,7 @@ function chunk(items, size) {
   return out;
 }
 
-async function seedShapes(sql, shapes) {
+export async function seedShapes(sql, shapes) {
   const entries = Object.entries(shapes);
 
   // 25 rows per statement. Shapes average ~1.1 KB of JSON and top out at
@@ -204,7 +204,7 @@ async function seedShapes(sql, shapes) {
   return entries.length;
 }
 
-async function seedLocations(sql, locations) {
+export async function seedLocations(sql, locations) {
   // 100 rows x 11 parameters = 1100 bind parameters per statement, comfortably
   // under Postgres's 65535 limit and small enough that a failure names a
   // narrow batch.
