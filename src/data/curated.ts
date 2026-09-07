@@ -112,7 +112,7 @@ export const CURATED_LOCATIONS: GameLocation[] = [
   { id: 94, name: 'Playa Boquerón', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.6, lat: 18.01024, lng: -67.17546 },
   { id: 95, name: 'Bahía Mosquito (Bio Bay)', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.5, lat: 18.0975, lng: -65.4433 },
   { id: 96, name: 'Parque de las Cavernas del Río Camuy', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.3, lat: 18.34399, lng: -66.82619 },
-  { id: 97, name: 'Cueva Ventana', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.1, lat: 18.37122, lng: -66.69156 },
+  { id: 97, name: 'Cueva Ventana', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.3, lat: 18.37122, lng: -66.69156 },
   { id: 98, name: 'Destilería Bacardí', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.2, lat: 18.4576, lng: -66.1416 },
   { id: 99, name: 'Aeropuerto Luis Muñoz Marín', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 1, lat: 18.4394, lng: -66.0018 },
   { id: 100, name: 'Parque de Bombas de Ponce', municipio: null, category: 'landmark', subtype: 'landmark', difficulty: 'medium', source: 'curated', radiusKm: 0.08, lat: 18.01191, lng: -66.61374 },
