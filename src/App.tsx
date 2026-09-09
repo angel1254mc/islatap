@@ -5,6 +5,7 @@ import Results from './components/Results';
 import RoundPrompt from './components/RoundPrompt';
 import RoundResult from './components/RoundResult';
 import StartScreen from './components/StartScreen';
+import SoundToggle from './components/SoundToggle';
 import StatusScreen from './components/StatusScreen';
 import { fetchDaily, submitGuess, userMessage, warmGuess } from './lib/api';
 import {
@@ -18,6 +19,7 @@ import {
   type DayEntry,
   type GameHistory,
 } from './lib/history';
+import { useTapSound } from './hooks/useTapSound';
 import { loadPracticeGame, scorePracticeGuess } from './lib/practice';
 import { INITIAL_GAME_STATE, gameReducer, totalScoreOf } from './lib/round-state';
 import { MIN_PING_MS, notBefore } from './lib/pacing';
@@ -228,9 +230,17 @@ export default function App() {
     dispatch({ type: 'practice/load-start' });
   }, []);
 
-  const handleGuess = useCallback((guess: LatLng) => {
-    dispatch({ type: 'guess/start', guess });
-  }, []);
+  // Held at App level, not in MapView: the toggle renders outside the map and
+  // has to read the same mute the tap handler writes.
+  const { playTapSounds, muted, toggleMuted, volume, setVolume, previewVolume } = useTapSound();
+
+  const handleGuess = useCallback(
+    (guess: LatLng) => {
+      playTapSounds();
+      dispatch({ type: 'guess/start', guess });
+    },
+    [playTapSounds],
+  );
 
   const handleRetryGuess = useCallback(() => {
     dispatch({ type: 'guess/retry' });
@@ -266,6 +276,14 @@ export default function App() {
         targetRadiusKm={revealed && lastOutcome ? lastOutcome.acceptRadiusKm : null}
         inside={revealed && lastOutcome ? lastOutcome.inside : false}
         onGuess={handleGuess}
+      />
+
+      <SoundToggle
+        muted={muted}
+        onToggle={toggleMuted}
+        volume={volume}
+        onVolumeChange={setVolume}
+        onPreview={previewVolume}
       />
 
       {promptVisible && currentPrompt && (
